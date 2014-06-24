@@ -4,7 +4,7 @@ import (
 	"github.com/101loops/clock"
 )
 
-const format = "20060102"
+const format = "060102"
 
 type APOD struct {
 	Clock clock.Clock
@@ -12,6 +12,6 @@ type APOD struct {
 
 // Now retutns a string with the date in ISO format.
 func (a *APOD) Now() string {
-  t := a.Clock.Now()
-  return t.Format(format) 
+	t := a.Clock.Now()
+	return t.Format(format)
 }
