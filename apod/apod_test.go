@@ -17,3 +17,11 @@ func TestNow(t *testing.T) {
 		t.Errorf("Expected %v, got %v", iso, apod.Now())
 	}
 }
+
+
+func TestToday(t *testing.T) {
+  rv := Today()
+  t.Log("Today returns ", rv)
+}
+
+
