@@ -17,50 +17,50 @@ func (a *APOD) Now() string {
 }
 
 // These are placeholder functions that are required to compile.
-func Today() string {
-  return "Today"
+func (a *APOD) Today() string {
+	return a.Now()
 }
 
-func NowShowing() string {
-  return "The background image showing now"
+func (a *APOD) NowShowing() string {
+	return "The background image showing now"
 }
 
-func RecentHistory(days int) string {
-  return "The last N days"
+func (a *APOD) RecentHistory(days int) string {
+	return "The last N days"
 }
 
-func ContainsImage(url string) bool {
-  return false
+func (a *APOD) ContainsImage(url string) bool {
+	return false
 }
 
-func IsDownloaded(isodate string) bool {
-  return false
+func (a *APOD) IsDownloaded(isodate string) bool {
+	return false
 }
 
-func Download(url string, isodate string) error {
-  return nil
+func (a *APOD) Download(url string, isodate string) error {
+	return nil
 }
 
-func IndexOf(isodate string) (int, error) {
-  return 0, nil
+func (a *APOD) IndexOf(isodate string) (int, error) {
+	return 0, nil
 }
 
-func SetViewingMode(fill bool) {}
+func (a *APOD) SetViewingMode(fill bool) {}
 
-func LoadConfig() error {
-  return nil
+func (a *APOD) LoadConfig() error {
+	return nil
 }
 
-func WallpaperDir() string {
-  return "Wallpaper directory"
+func (a *APOD) WallpaperDir() string {
+	return "Wallpaper directory"
 }
 
-func UrlForDate(isodate string) string {
-  return "Some APOD URL"
+func (a *APOD) UrlForDate(isodate string) string {
+	return "Some APOD URL"
 }
 
-func DownloadedWallpapers() string {
-  return "Downloaded wallpapers"
+func (a *APOD) DownloadedWallpapers() string {
+	return "Downloaded wallpapers"
 }
 
-func SetWallpaper(path string) {}
+func (a *APOD) SetWallpaper(path string) {}
