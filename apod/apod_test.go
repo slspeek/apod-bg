@@ -12,7 +12,7 @@ func TestNow(t *testing.T) {
 	m := clock.NewMock()
 	m.Set(t0)
 
-	apod := APOD{m}
+	apod := APOD{Clock: m}
 	if apod.Now() != iso {
 		t.Errorf("Expected %v, got %v", iso, apod.Now())
 	}
@@ -24,7 +24,7 @@ func TestToday(t *testing.T) {
 	m := clock.NewMock()
 	m.Set(t0)
 
-	apod := APOD{m}
+	apod := APOD{Clock: m}
 	if apod.Today() != iso {
 		t.Errorf("Expected %v, got %v", iso, apod.Today())
 	}

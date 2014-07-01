@@ -6,8 +6,18 @@ import (
 
 const format = "060102"
 
+type Config struct {
+	Fehbg        string
+	WallpaperDir string
+}
+
+func LoadConfig() (Config, error) {
+	return Config{}, nil
+}
+
 type APOD struct {
-	Clock clock.Clock
+	Clock  clock.Clock
+	Config Config
 }
 
 // Now returns a string with the date in ISO format.
@@ -46,14 +56,6 @@ func (a *APOD) IndexOf(isodate string) (int, error) {
 }
 
 func (a *APOD) SetViewingMode(fill bool) {}
-
-func (a *APOD) LoadConfig() error {
-	return nil
-}
-
-func (a *APOD) WallpaperDir() string {
-	return "Wallpaper directory"
-}
 
 func (a *APOD) UrlForDate(isodate string) string {
 	return "Some APOD URL"
