@@ -2,17 +2,24 @@ package apod
 
 import (
 	"github.com/101loops/clock"
+	"os"
 )
 
 const format = "060102"
 
 type Config struct {
-	Fehbg        string
+	StateFile    string
 	WallpaperDir string
 }
 
 func LoadConfig() (Config, error) {
-	return Config{}, nil
+	fehbg := os.ExpandEnv("${HOME}/.fehbg")
+	wallpaperDir := os.ExpandEnv("${HOME}/.config/apod-bg/wallpapers")
+	err := os.MkdirAll(wallpaperDir, 0700)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{StateFile: fehbg, WallpaperDir: wallpaperDir}, nil
 }
 
 type APOD struct {
