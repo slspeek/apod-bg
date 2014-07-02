@@ -1,6 +1,7 @@
 package apod
 
 import (
+	"fmt"
 	"github.com/101loops/clock"
 	"os"
 )
@@ -64,8 +65,9 @@ func (a *APOD) IndexOf(isodate string) (int, error) {
 
 func (a *APOD) SetViewingMode(fill bool) {}
 
+// UrlForDate returns the URL for the APOD page for the given isodate.
 func (a *APOD) UrlForDate(isodate string) string {
-	return "Some APOD URL"
+	return fmt.Sprintf("http://apod.nasa.gov/apod/ap%s.html", isodate)
 }
 
 func (a *APOD) DownloadedWallpapers() string {

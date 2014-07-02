@@ -29,3 +29,11 @@ func TestToday(t *testing.T) {
 		t.Errorf("Expected %v, got %v", iso, apod.Today())
 	}
 }
+
+func TestUrlForDate(t *testing.T) {
+	apod := APOD{}
+	url := apod.UrlForDate("140121")
+	if url != "http://apod.nasa.gov/apod/ap140121.html" {
+		t.Errorf("Expected: http://apod.nasa.gov/apod/ap140121.html, got %s", url)
+	}
+}
