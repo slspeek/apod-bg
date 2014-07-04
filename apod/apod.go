@@ -3,10 +3,14 @@ package apod
 import (
 	"fmt"
 	"github.com/101loops/clock"
+	"io/ioutil"
 	"os"
+	"regexp"
 )
 
 const format = "060102"
+
+var isodateExpr = regexp.MustCompile(`(\d{6})`)
 
 type Config struct {
 	StateFile    string
@@ -39,8 +43,20 @@ func (a *APOD) Today() string {
 	return a.Now()
 }
 
-func (a *APOD) NowShowing() string {
-	return "The background image showing now"
+func (a *APOD) NowShowing() (string, error) {
+	sf, err := os.Open(a.Config.StateFile)
+	if err != nil {
+		return "", err
+	}
+	bs, err := ioutil.ReadAll(sf)
+	if err != nil {
+		return "", err
+	}
+	if m := isodateExpr.FindStringSubmatch(string(bs)); m != nil {
+		return m[1], nil
+	} else {
+		return "", fmt.Errorf("Nothing found")
+	}
 }
 
 func (a *APOD) RecentHistory(days int) string {

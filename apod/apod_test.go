@@ -2,6 +2,7 @@ package apod
 
 import (
 	"github.com/101loops/clock"
+	"os"
 	"testing"
 	"time"
 )
@@ -35,5 +36,32 @@ func TestUrlForDate(t *testing.T) {
 	url := apod.UrlForDate("140121")
 	if url != "http://apod.nasa.gov/apod/ap140121.html" {
 		t.Errorf("Expected: http://apod.nasa.gov/apod/ap140121.html, got %s", url)
+	}
+}
+
+func TestNowShowing(t *testing.T) {
+	f, err := os.Create("foo")
+	if err != nil {
+		t.Fatal("could not create file foo")
+	}
+	defer os.Remove("foo")
+	_, err = f.WriteString(`feh  --bg-max '140121-apod.jpg'`)
+	if err != nil {
+		t.Fatal("could write to file  foo")
+	}
+	err = f.Close()
+	if err != nil {
+		t.Fatal("could close file foo")
+	}
+	cfg := Config{StateFile: "foo"}
+
+	apod := APOD{Config: cfg}
+
+	rv, err := apod.NowShowing()
+	if err != nil {
+		t.Fatalf("Error during call to NowShowing")
+	}
+	if rv != "140121" {
+		t.Errorf("Expected 140121, got %v", rv)
 	}
 }
