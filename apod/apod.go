@@ -66,7 +66,15 @@ func (a *APOD) RecentHistory(days int) []string {
 }
 
 func (a *APOD) loadPage(url string) (string, error) {
-	return "", nil
+  resp, err := a.Client.Get(url)
+  if err != nil {
+    return "", err
+  }
+  b, err := ioutil.ReadAll(resp.Body)
+  if err != nil {
+    return "", err
+  }
+	return string(b),  nil
 }
 
 func (a *APOD) ContainsImage(url string) bool {
