@@ -9,9 +9,11 @@ import (
 	"regexp"
 )
 
+const apodBase = "http://apod.nasa.gov/apod/"
 const format = "060102"
 
 var isodateExpr = regexp.MustCompile(`(\d{6})`)
+var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
 type Config struct {
 	StateFile    string
@@ -34,15 +36,10 @@ type APOD struct {
 	Client *http.Client
 }
 
-// Now returns a string with the date in ISO format.
-func (a *APOD) Now() string {
+// Today returns a string with the date in ISO format.
+func (a *APOD) Today() string {
 	t := a.Clock.Now()
 	return t.Format(format)
-}
-
-// These are placeholder functions that are required to compile.
-func (a *APOD) Today() string {
-	return a.Now()
 }
 
 func (a *APOD) NowShowing() (string, error) {
@@ -66,19 +63,27 @@ func (a *APOD) RecentHistory(days int) []string {
 }
 
 func (a *APOD) loadPage(url string) (string, error) {
-  resp, err := a.Client.Get(url)
-  if err != nil {
-    return "", err
-  }
-  b, err := ioutil.ReadAll(resp.Body)
-  if err != nil {
-    return "", err
-  }
-	return string(b),  nil
+	resp, err := a.Client.Get(url)
+	if err != nil {
+		return "", err
+	}
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
-func (a *APOD) ContainsImage(url string) bool {
-	return false
+func (a *APOD) ContainsImage(url string) (bool, string, error) {
+	content, err := a.loadPage(url)
+	if err != nil {
+		return false, "", err
+	}
+	m := imageExpr.FindStringSubmatch(content)
+	if m != nil && m[1] != "" {
+		return true, apodBase + m[1], nil
+	}
+	return false, "", nil
 }
 
 func (a *APOD) IsDownloaded(isodate string) bool {

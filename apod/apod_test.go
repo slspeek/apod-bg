@@ -10,18 +10,6 @@ import (
 	"time"
 )
 
-func TestNow(t *testing.T) {
-	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
-	iso := "140121"
-	m := clock.NewMock()
-	m.Set(t0)
-
-	apod := APOD{Clock: m}
-	if apod.Now() != iso {
-		t.Errorf("Expected %v, got %v", iso, apod.Now())
-	}
-}
-
 func TestToday(t *testing.T) {
 	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
 	iso := "140121"
@@ -69,24 +57,37 @@ func TestNowShowing(t *testing.T) {
 	}
 }
 
-  type loopback struct {}
-  func (l loopback) RoundTrip(*http.Request) (*http.Response, error) {
-    resp, err := http.ReadResponse(bufio.NewReader(strings.NewReader(apodResponse)), nil)
-    if err != nil {
-      return nil, err
-    }
-    return resp, nil
-  }
+type loopback struct{}
+
+func (l loopback) RoundTrip(*http.Request) (*http.Response, error) {
+	resp, err := http.ReadResponse(bufio.NewReader(strings.NewReader(apodResponse)), nil)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func TestContainsImage(t *testing.T) {
+	apod := APOD{Client: &http.Client{Transport: loopback{}}}
+	yes, url, err := apod.ContainsImage("http://apod.nasa.gov/apod/astropix.html")
+	if err != nil {
+		t.Fatal("could not load page")
+	}
+	t.Logf("Found: %v; URL: %s", yes, url)
+	if url != "http://apod.nasa.gov/apod/image/1407/nycsunset_tyson_768.jpg" {
+		t.Fatalf("Expected http://apod.nasa.gov/apod/image/1407/nycsunset_tyson_768.jpg but got %v", url)
+	}
+
+}
 func TestLoadPage(t *testing.T) {
 	cfg := Config{StateFile: "foo"}
-  apod := APOD{Config: cfg, Client:&http.Client{Transport: loopback{}},}
-  page, err := apod.loadPage("http://apod.nasa.gov/apod/astropix.html")
-  if err != nil {
-    t.Fatalf("Error loading page: %v", err)
-  }
- t.Log("Retrieved page: ", page)
- }
-
+	apod := APOD{Config: cfg, Client: &http.Client{Transport: loopback{}}}
+	page, err := apod.loadPage("http://apod.nasa.gov/apod/astropix.html")
+	if err != nil {
+		t.Fatalf("Error loading page: %v", err)
+	}
+	t.Log("Retrieved page: ", page)
+}
 
 var apodResponse = `HTTP/1.1 200 OK
 Date: Mon, 07 Jul 2014 12:06:30 GMT
