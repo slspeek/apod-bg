@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/101loops/clock"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"regexp"
 )
@@ -30,6 +31,7 @@ func LoadConfig() (Config, error) {
 type APOD struct {
 	Clock  clock.Clock
 	Config Config
+	Client *http.Client
 }
 
 // Now returns a string with the date in ISO format.
@@ -59,8 +61,12 @@ func (a *APOD) NowShowing() (string, error) {
 	}
 }
 
-func (a *APOD) RecentHistory(days int) string {
-	return "The last N days"
+func (a *APOD) RecentHistory(days int) []string {
+	return []string{""}
+}
+
+func (a *APOD) loadPage(url string) (string, error) {
+	return "", nil
 }
 
 func (a *APOD) ContainsImage(url string) bool {
@@ -86,8 +92,8 @@ func (a *APOD) UrlForDate(isodate string) string {
 	return fmt.Sprintf("http://apod.nasa.gov/apod/ap%s.html", isodate)
 }
 
-func (a *APOD) DownloadedWallpapers() string {
-	return "Downloaded wallpapers"
+func (a *APOD) DownloadedWallpapers() []string {
+	return []string{""}
 }
 
 func (a *APOD) SetWallpaper(path string) {}
