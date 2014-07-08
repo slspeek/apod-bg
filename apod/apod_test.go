@@ -5,6 +5,7 @@ import (
 	"github.com/101loops/clock"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -77,8 +78,17 @@ func TestContainsImage(t *testing.T) {
 	if url != "http://apod.nasa.gov/apod/image/1407/nycsunset_tyson_768.jpg" {
 		t.Fatalf("Expected http://apod.nasa.gov/apod/image/1407/nycsunset_tyson_768.jpg but got %v", url)
 	}
-
 }
+
+func TestFileName(t *testing.T) {
+	apod := APOD{Config: Config{WallpaperDir: "foo"}}
+	expected := filepath.Join("foo", "apod-img-140121")
+	got := apod.fileName("140121")
+	if expected != got {
+		t.Fatalf("Expected: %v, got %v", expected, got)
+	}
+}
+
 func TestLoadPage(t *testing.T) {
 	cfg := Config{StateFile: "foo"}
 	apod := APOD{Config: cfg, Client: &http.Client{Transport: loopback{}}}

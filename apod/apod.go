@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 )
 
@@ -86,8 +87,24 @@ func (a *APOD) ContainsImage(url string) (bool, string, error) {
 	return false, "", nil
 }
 
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
 func (a *APOD) IsDownloaded(isodate string) bool {
-	return false
+	file := a.fileName(isodate)
+	fileExists, err := exists(file)
+	if err != nil {
+		return true
+	}
+	return fileExists
 }
 
 func (a *APOD) Download(url string, isodate string) error {
@@ -103,6 +120,10 @@ func (a *APOD) SetViewingMode(fill bool) {}
 // UrlForDate returns the URL for the APOD page for the given isodate.
 func (a *APOD) UrlForDate(isodate string) string {
 	return fmt.Sprintf("http://apod.nasa.gov/apod/ap%s.html", isodate)
+}
+
+func (a *APOD) fileName(isodate string) string {
+	return filepath.Join(a.Config.WallpaperDir, fmt.Sprintf("apod-img-%s", isodate))
 }
 
 func (a *APOD) DownloadedWallpapers() []string {
