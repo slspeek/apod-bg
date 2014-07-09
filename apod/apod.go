@@ -3,6 +3,7 @@ package apod
 import (
 	"fmt"
 	"github.com/101loops/clock"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -108,7 +109,20 @@ func (a *APOD) IsDownloaded(isodate string) bool {
 }
 
 func (a *APOD) Download(url string, isodate string) error {
-	return nil
+	file := a.fileName(isodate)
+	output, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	resp, err := a.Client.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(output, resp.Body)
+	return err
 }
 
 func (a *APOD) IndexOf(isodate string) (int, error) {
