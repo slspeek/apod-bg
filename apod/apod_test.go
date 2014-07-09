@@ -112,10 +112,7 @@ func TestDownload(t *testing.T) {
 	}
 }
 
-func TestDownloadedWallpapers(t *testing.T) {
-	defer func() {
-		os.RemoveAll("foo")
-	}()
+func prepareTest(t *testing.T) {
 	err := os.MkdirAll("foo", 0700)
 	if err != nil {
 		t.Fatal(err)
@@ -125,17 +122,17 @@ func TestDownloadedWallpapers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	one, err := os.Create("bar")
+	one, err := os.Create("apod-img-000401")
 	if err != nil {
 		t.Fatal(err)
 	}
 	one.Close()
-	two, err := os.Create("baz")
+	two, err := os.Create("apod-img-010401")
 	if err != nil {
 		t.Fatal(err)
 	}
 	two.Close()
-	three, err := os.Create("foobar")
+	three, err := os.Create("apod-img-020401")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +141,12 @@ func TestDownloadedWallpapers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+}
+func TestDownloadedWallpapers(t *testing.T) {
+	defer func() {
+		os.RemoveAll("foo")
+	}()
+	prepareTest(t)
 	cfg := Config{WallpaperDir: "foo"}
 	apod := APOD{Config: cfg}
 
@@ -155,6 +157,22 @@ func TestDownloadedWallpapers(t *testing.T) {
 
 	if len(files) != 3 {
 		t.Fatal("Expected 3 files")
+	}
+
+}
+
+func TestIndexOf(t *testing.T) {
+	defer func() {
+		os.RemoveAll("foo")
+	}()
+	apod := APOD{Config: Config{WallpaperDir: "foo"}}
+	prepareTest(t)
+	i, err := apod.IndexOf("010401")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i != 1 {
+		t.Fatalf("Expected 1, got %d", i)
 	}
 
 }

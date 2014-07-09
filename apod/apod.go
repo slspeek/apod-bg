@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 )
 
 const apodBase = "http://apod.nasa.gov/apod/"
@@ -126,7 +127,17 @@ func (a *APOD) Download(url string, isodate string) error {
 }
 
 func (a *APOD) IndexOf(isodate string) (int, error) {
-	return 0, nil
+	target := a.fileBaseName(isodate)
+	all, err := a.DownloadedWallpapers()
+	if err != nil {
+		return 0, err
+	}
+	for i, elem := range all {
+		if elem == target {
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("Not found")
 }
 
 func (a *APOD) SetViewingMode(fill bool) {}
@@ -137,7 +148,11 @@ func (a *APOD) UrlForDate(isodate string) string {
 }
 
 func (a *APOD) fileName(isodate string) string {
-	return filepath.Join(a.Config.WallpaperDir, fmt.Sprintf("apod-img-%s", isodate))
+	return filepath.Join(a.Config.WallpaperDir, a.fileBaseName(isodate))
+}
+
+func (a *APOD) fileBaseName(isodate string) string {
+	return fmt.Sprintf("apod-img-%s", isodate)
 }
 
 func (a *APOD) DownloadedWallpapers() ([]string, error) {
@@ -149,7 +164,12 @@ func (a *APOD) DownloadedWallpapers() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	sort.Strings(files)
 	return files, nil
+}
+
+func (a *APOD) Jump(n int) error {
+	return nil
 }
 
 func (a *APOD) SetWallpaper(path string) {}
