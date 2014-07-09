@@ -110,9 +110,54 @@ func TestDownload(t *testing.T) {
 	if info.Size() != 181298 {
 		t.Fatalf("Wrong size expected 181298")
 	}
-
 }
 
+func TestDownloadedWallpapers(t *testing.T) {
+	defer func() {
+		os.RemoveAll("foo")
+	}()
+	err := os.MkdirAll("foo", 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.Chdir("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	one, err := os.Create("bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	one.Close()
+	two, err := os.Create("baz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	two.Close()
+	three, err := os.Create("foobar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	three.Close()
+	err = os.Chdir("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{WallpaperDir: "foo"}
+	apod := APOD{Config: cfg}
+
+	files, err := apod.DownloadedWallpapers()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(files) != 3 {
+		t.Fatal("Expected 3 files")
+	}
+
+}
 func TestFileName(t *testing.T) {
 	apod := APOD{Config: Config{WallpaperDir: "foo"}}
 	expected := filepath.Join("foo", "apod-img-140121")

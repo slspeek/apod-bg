@@ -140,8 +140,16 @@ func (a *APOD) fileName(isodate string) string {
 	return filepath.Join(a.Config.WallpaperDir, fmt.Sprintf("apod-img-%s", isodate))
 }
 
-func (a *APOD) DownloadedWallpapers() []string {
-	return []string{""}
+func (a *APOD) DownloadedWallpapers() ([]string, error) {
+	dir, err := os.Open(a.Config.WallpaperDir)
+	if err != nil {
+		return nil, err
+	}
+	files, err := dir.Readdirnames(0)
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
 }
 
 func (a *APOD) SetWallpaper(path string) {}
