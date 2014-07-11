@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -15,7 +16,7 @@ import (
 const apodBase = "http://apod.nasa.gov/apod/"
 const format = "060102"
 const setWallpaperScript = `#!/bin/bash
-feh --bg-scale $WALLPAPER
+feh --bg-max $WALLPAPER
 `
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
@@ -23,6 +24,7 @@ var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 type Config struct {
 	StateFile    string
 	WallpaperDir string
+	SetWallpaper string
 }
 
 func LoadConfig() (Config, error) {
@@ -31,17 +33,25 @@ func LoadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	setScript := filepath.Join(configDir, "set-wallpaper.sh")
-	ok, err := exists(setScript)
+	scriptFile := filepath.Join(configDir, "set-wallpaper.sh")
+	ok, err := exists(scriptFile)
 	if err != nil {
 		return Config{}, err
 	}
 	if !ok {
-		s, err := os.Create(setScript)
+		s, err := os.Create(scriptFile)
 		if err != nil {
 			return Config{}, err
 		}
 		_, err = s.WriteString(setWallpaperScript)
+		if err != nil {
+			return Config{}, err
+		}
+		err = s.Close()
+		if err != nil {
+			return Config{}, err
+		}
+		err = os.Chmod(scriptFile, 0755)
 		if err != nil {
 			return Config{}, err
 		}
@@ -52,7 +62,7 @@ func LoadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{StateFile: nowShowing, WallpaperDir: wallpaperDir}, nil
+	return Config{StateFile: nowShowing, WallpaperDir: wallpaperDir, SetWallpaper: scriptFile}, nil
 }
 
 type APOD struct {
@@ -127,7 +137,7 @@ func (a *APOD) IsDownloaded(isodate string) bool {
 	return fileExists
 }
 
-func (a *APOD) Download(url string, isodate string) error {
+func (a *APOD) download(url string, isodate string) error {
 	file := a.fileName(isodate)
 	output, err := os.Create(file)
 	if err != nil {
@@ -144,6 +154,22 @@ func (a *APOD) Download(url string, isodate string) error {
 	return err
 }
 
+func (a *APOD) Download(isodate string) (bool, error) {
+	pageURL := a.UrlForDate(isodate)
+	success, imgURL, err := a.ContainsImage(pageURL)
+	if err != nil {
+		return false, err
+	}
+	if !success {
+		return false, nil
+	}
+	err = a.download(imgURL, isodate)
+	if err != nil {
+		return true, err
+	}
+	return true, nil
+
+}
 func (a *APOD) IndexOf(isodate string) (int, error) {
 	target := a.fileBaseName(isodate)
 	all, err := a.DownloadedWallpapers()
@@ -191,7 +217,25 @@ func (a *APOD) Jump(n int) error {
 }
 
 func (a *APOD) SetWallpaper(isodate string) error {
-	return nil
+	wallpaper := a.fileName(isodate)
+	cmd := exec.Command(a.Config.SetWallpaper)
+	env := os.Environ()
+	env = append(env, "WALLPAPER="+wallpaper)
+	cmd.Env = env
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	return a.store(isodate)
+}
+
+func (a *APOD) store(isodate string) error {
+	s, err := os.Create(a.Config.StateFile)
+	if err != nil {
+		return err
+	}
+	_, err = s.WriteString(isodate)
+	return err
 }
 
 func (a *APOD) ToggleViewMode() {

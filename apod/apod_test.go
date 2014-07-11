@@ -14,13 +14,55 @@ import (
 
 const testDateString = "140121"
 
+func TestSetWallpaper(t *testing.T) {
+	homeFile, err := spoofHome()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(homeFile)
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	apod := APOD{Config: cfg, Client: http.DefaultClient}
+	ok, err := apod.Download(testDateString)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("21 januari 2014 does contain an image on APOD")
+	}
+	err = apod.SetWallpaper(testDateString)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func spoofHome() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	homeFile := filepath.Join(cwd, "home")
+	err = os.MkdirAll(homeFile, 0700)
+	if err != nil {
+		return "", err
+	}
+	return homeFile, nil
+}
+
 func TestLoadConfig(t *testing.T) {
+	homeFile, err := spoofHome()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(homeFile)
+	err = os.Setenv("HOME", homeFile)
 	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(cfg)
-
 }
 
 func TestExecEnv(t *testing.T) {
@@ -102,7 +144,7 @@ func TestContainsImage(t *testing.T) {
 
 func TestDownload(t *testing.T) {
 	apod := APOD{Client: http.DefaultClient}
-	err := apod.Download("http://apod.nasa.gov/apod/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
+	err := apod.download("http://apod.nasa.gov/apod/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
 	if err != nil {
 		t.Fatal("could not load page")
 	}
