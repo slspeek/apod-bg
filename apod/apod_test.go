@@ -5,6 +5,7 @@ import (
 	"github.com/101loops/clock"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,25 @@ import (
 
 const testDateString = "140121"
 
+func TestLoadConfig(t *testing.T) {
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(cfg)
+
+}
+
+func TestExecEnv(t *testing.T) {
+	cmd := exec.Command("./test.sh")
+	env := os.Environ()
+	env = append(env, "MESSAGE=foo")
+	cmd.Env = env
+	err := cmd.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 func TestToday(t *testing.T) {
 	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
 	m := clock.NewMock()
@@ -38,7 +58,7 @@ func TestNowShowing(t *testing.T) {
 		t.Fatal("could not create file foo")
 	}
 	defer os.Remove("foo")
-	_, err = f.WriteString(`feh  --bg-max '140121-apod.jpg'`)
+	_, err = f.WriteString(`140121`)
 	if err != nil {
 		t.Fatal("could write to file  foo")
 	}
@@ -128,6 +148,7 @@ func prepareTest(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
 func TestDownloadedWallpapers(t *testing.T) {
 	defer func() {
 		os.RemoveAll("foo")

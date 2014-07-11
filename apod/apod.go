@@ -14,8 +14,10 @@ import (
 
 const apodBase = "http://apod.nasa.gov/apod/"
 const format = "060102"
+const setWallpaperScript = `#!/bin/bash
+feh --bg-scale $WALLPAPER
+`
 
-var isodateExpr = regexp.MustCompile(`(\d{6})`)
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
 type Config struct {
@@ -24,13 +26,33 @@ type Config struct {
 }
 
 func LoadConfig() (Config, error) {
-	fehbg := os.ExpandEnv("${HOME}/.fehbg")
-	wallpaperDir := os.ExpandEnv("${HOME}/.config/apod-bg/wallpapers")
-	err := os.MkdirAll(wallpaperDir, 0700)
+	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
+	err := os.MkdirAll(configDir, 0700)
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{StateFile: fehbg, WallpaperDir: wallpaperDir}, nil
+	setScript := filepath.Join(configDir, "set-wallpaper.sh")
+	ok, err := exists(setScript)
+	if err != nil {
+		return Config{}, err
+	}
+	if !ok {
+		s, err := os.Create(setScript)
+		if err != nil {
+			return Config{}, err
+		}
+		_, err = s.WriteString(setWallpaperScript)
+		if err != nil {
+			return Config{}, err
+		}
+	}
+	nowShowing := filepath.Join(configDir, "now-showing")
+	wallpaperDir := filepath.Join(configDir, "wallpapers")
+	err = os.MkdirAll(wallpaperDir, 0700)
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{StateFile: nowShowing, WallpaperDir: wallpaperDir}, nil
 }
 
 type APOD struct {
@@ -54,11 +76,7 @@ func (a *APOD) NowShowing() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if m := isodateExpr.FindStringSubmatch(string(bs)); m != nil {
-		return m[1], nil
-	} else {
-		return "", fmt.Errorf("Nothing found")
-	}
+	return string(bs), nil
 }
 
 func (a *APOD) RecentHistory(days int) []string {
@@ -172,4 +190,21 @@ func (a *APOD) Jump(n int) error {
 	return nil
 }
 
-func (a *APOD) SetWallpaper(path string) {}
+func (a *APOD) SetWallpaper(isodate string) error {
+	return nil
+}
+
+func (a *APOD) ToggleViewMode() {
+}
+
+func (a *APOD) VisitAPODSite() {
+}
+
+func (a *APOD) DisplayCurrent() error {
+	isodate, err := a.NowShowing()
+	if err != nil {
+		return err
+	}
+	err = a.SetWallpaper(isodate)
+	return err
+}
