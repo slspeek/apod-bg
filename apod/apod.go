@@ -2,7 +2,6 @@ package apod
 
 import (
 	"fmt"
-	"github.com/101loops/clock"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -11,10 +10,17 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+
+	"github.com/101loops/clock"
+	"github.com/skratchdot/open-golang/open"
 )
 
-const apodBase = "http://apod.nasa.gov/apod/"
-const format = "060102"
+const (
+	apodBase  = "http://apod.nasa.gov/apod/"
+	format    = "060102"
+	imgprefix = "apod-img-"
+)
+
 const setWallpaperScript = `#!/bin/bash
 feh --bg-max $WALLPAPER
 `
@@ -77,6 +83,23 @@ func (a *APOD) Today() string {
 	return t.Format(format)
 }
 
+func (a *APOD) OpenAPOD(isodate string) error {
+	url := a.UrlForDate(isodate)
+	return open.Start(url)
+}
+
+func (a *APOD) OpenAPODToday() error {
+	return a.OpenAPOD(a.Today())
+}
+
+func (a *APOD) OpenAPODOnBackground() error {
+	isodate, err := a.NowShowing()
+	if err != nil {
+		return fmt.Errorf("Could not get hold on the picture that is currently shown, because: %v", err)
+	}
+	return a.OpenAPOD(isodate)
+}
+
 func (a *APOD) NowShowing() (string, error) {
 	sf, err := os.Open(a.Config.StateFile)
 	if err != nil {
@@ -89,20 +112,10 @@ func (a *APOD) NowShowing() (string, error) {
 	return string(bs), nil
 }
 
-func (a *APOD) RecentHistory(days int) []string {
-	return []string{""}
-}
-
-func (a *APOD) loadPage(url string) (string, error) {
-	resp, err := a.Client.Get(url)
-	if err != nil {
-		return "", err
+func (a *APOD) LoadRecentPast(days int) {
+	for _, isodate := range a.recentPast(days) {
+		a.Download(isodate)
 	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
 }
 
 func (a *APOD) ContainsImage(url string) (bool, string, error) {
@@ -155,6 +168,9 @@ func (a *APOD) download(url string, isodate string) error {
 }
 
 func (a *APOD) Download(isodate string) (bool, error) {
+	if downloaded := a.IsDownloaded(isodate); downloaded {
+		return true, nil
+	}
 	pageURL := a.UrlForDate(isodate)
 	success, imgURL, err := a.ContainsImage(pageURL)
 	if err != nil {
@@ -168,8 +184,8 @@ func (a *APOD) Download(isodate string) (bool, error) {
 		return true, err
 	}
 	return true, nil
-
 }
+
 func (a *APOD) IndexOf(isodate string) (int, error) {
 	target := a.fileBaseName(isodate)
 	all, err := a.DownloadedWallpapers()
@@ -191,14 +207,6 @@ func (a *APOD) UrlForDate(isodate string) string {
 	return fmt.Sprintf("http://apod.nasa.gov/apod/ap%s.html", isodate)
 }
 
-func (a *APOD) fileName(isodate string) string {
-	return filepath.Join(a.Config.WallpaperDir, a.fileBaseName(isodate))
-}
-
-func (a *APOD) fileBaseName(isodate string) string {
-	return fmt.Sprintf("apod-img-%s", isodate)
-}
-
 func (a *APOD) DownloadedWallpapers() ([]string, error) {
 	dir, err := os.Open(a.Config.WallpaperDir)
 	if err != nil {
@@ -213,7 +221,25 @@ func (a *APOD) DownloadedWallpapers() ([]string, error) {
 }
 
 func (a *APOD) Jump(n int) error {
-	return nil
+	all, err := a.DownloadedWallpapers()
+	if err != nil {
+		return err
+	}
+	now, err := a.NowShowing()
+	if err != nil {
+		return err
+	}
+	idx, err := a.IndexOf(now)
+	if err != nil {
+		return err
+	}
+	toGo := idx + n
+	if toGo >= len(all) || toGo < 0 {
+		return fmt.Errorf("Out of bounds")
+	}
+	newImageBaseName := all[toGo]
+	err = a.SetWallpaper(newImageBaseName[9:])
+	return err
 }
 
 func (a *APOD) SetWallpaper(isodate string) error {
@@ -241,9 +267,6 @@ func (a *APOD) store(isodate string) error {
 func (a *APOD) ToggleViewMode() {
 }
 
-func (a *APOD) VisitAPODSite() {
-}
-
 func (a *APOD) DisplayCurrent() error {
 	isodate, err := a.NowShowing()
 	if err != nil {
@@ -251,4 +274,33 @@ func (a *APOD) DisplayCurrent() error {
 	}
 	err = a.SetWallpaper(isodate)
 	return err
+}
+
+func (a *APOD) recentPast(days int) []string {
+	today := a.Clock.Now()
+	var dates []string
+	for i := 1; i < days+1; i++ {
+		dates = append(dates, today.AddDate(0, 0, -i).Format(format))
+	}
+	return dates
+}
+
+func (a *APOD) loadPage(url string) (string, error) {
+	resp, err := a.Client.Get(url)
+	if err != nil {
+		return "", err
+	}
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func (a *APOD) fileName(isodate string) string {
+	return filepath.Join(a.Config.WallpaperDir, a.fileBaseName(isodate))
+}
+
+func (a *APOD) fileBaseName(isodate string) string {
+	return fmt.Sprintf(imgprefix+"%s", isodate)
 }

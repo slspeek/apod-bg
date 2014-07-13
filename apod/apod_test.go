@@ -5,7 +5,6 @@ import (
 	"github.com/101loops/clock"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -65,16 +64,6 @@ func TestLoadConfig(t *testing.T) {
 	t.Log(cfg)
 }
 
-func TestExecEnv(t *testing.T) {
-	cmd := exec.Command("./test.sh")
-	env := os.Environ()
-	env = append(env, "MESSAGE=foo")
-	cmd.Env = env
-	err := cmd.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
 func TestToday(t *testing.T) {
 	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
 	m := clock.NewMock()
