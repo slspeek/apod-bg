@@ -27,12 +27,14 @@ feh --bg-max $WALLPAPER
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
+// Config sets where to find the image now showing, the wallpaper directory and the wallpaper to set.
 type Config struct {
 	StateFile    string
 	WallpaperDir string
 	SetWallpaper string
 }
 
+// LoadConfig loads the above Config or, failing that, throw an error. 
 func LoadConfig() (Config, error) {
 	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
 	err := os.MkdirAll(configDir, 0700)
@@ -77,21 +79,24 @@ type APOD struct {
 	Client *http.Client
 }
 
-// Today returns a string with the date in ISO format.
+// Today returns the date of today in a formatted string.
 func (a *APOD) Today() string {
 	t := a.Clock.Now()
 	return t.Format(format)
 }
 
+// OpenAPOD opens the webpage at apod.nasa.gov for a given day in the default browser.
 func (a *APOD) OpenAPOD(isodate string) error {
 	url := a.UrlForDate(isodate)
 	return open.Start(url)
 }
 
+// OpenAPODToday opens the today's page at apod.nasa.gov .
 func (a *APOD) OpenAPODToday() error {
 	return a.OpenAPOD(a.Today())
 }
 
+// OpenAPODOnBackground opens the apod.nasa.gov page for the wallpaper now showing, or failing that, throws an error.
 func (a *APOD) OpenAPODOnBackground() error {
 	isodate, err := a.NowShowing()
 	if err != nil {
@@ -100,6 +105,7 @@ func (a *APOD) OpenAPODOnBackground() error {
 	return a.OpenAPOD(isodate)
 }
 
+// NowShowing returns isodate string YYMMDD.
 func (a *APOD) NowShowing() (string, error) {
 	sf, err := os.Open(a.Config.StateFile)
 	if err != nil {
@@ -112,12 +118,14 @@ func (a *APOD) NowShowing() (string, error) {
 	return string(bs), nil
 }
 
+// LoadRecentPast loads images from apod.nasa.gov to the wallpaper dir, for a set number of days back, or throws error.
 func (a *APOD) LoadRecentPast(days int) {
 	for _, isodate := range a.recentPast(days) {
 		a.Download(isodate)
 	}
 }
 
+// ContainsImage parses an APOD page for a linked image, returns false/true, and image URL if successful.
 func (a *APOD) ContainsImage(url string) (bool, string, error) {
 	content, err := a.loadPage(url)
 	if err != nil {
@@ -141,6 +149,7 @@ func exists(path string) (bool, error) {
 	return false, err
 }
 
+// IsDownloaded checks whether an image file is downloaded for a given date.
 func (a *APOD) IsDownloaded(isodate string) bool {
 	file := a.fileName(isodate)
 	fileExists, err := exists(file)
@@ -167,6 +176,7 @@ func (a *APOD) download(url string, isodate string) error {
 	return err
 }
 
+// Download downloads the image from apod.nasa.gov for the given date.
 func (a *APOD) Download(isodate string) (bool, error) {
 	if downloaded := a.IsDownloaded(isodate); downloaded {
 		return true, nil
@@ -186,6 +196,7 @@ func (a *APOD) Download(isodate string) (bool, error) {
 	return true, nil
 }
 
+// IndexOf returns the index of an image in the wallpaper directory.
 func (a *APOD) IndexOf(isodate string) (int, error) {
 	target := a.fileBaseName(isodate)
 	all, err := a.DownloadedWallpapers()
@@ -220,6 +231,7 @@ func (a *APOD) DownloadedWallpapers() ([]string, error) {
 	return files, nil
 }
 
+// Jump jumps to an image next or previous in the wallpaper directory.
 func (a *APOD) Jump(n int) error {
 	all, err := a.DownloadedWallpapers()
 	if err != nil {
@@ -242,6 +254,7 @@ func (a *APOD) Jump(n int) error {
 	return err
 }
 
+// SetWallpaper sets the wallpaper to the image from the wallpaper directory for the given date.
 func (a *APOD) SetWallpaper(isodate string) error {
 	wallpaper := a.fileName(isodate)
 	cmd := exec.Command(a.Config.SetWallpaper)
@@ -263,10 +276,11 @@ func (a *APOD) store(isodate string) error {
 	_, err = s.WriteString(isodate)
 	return err
 }
-
+// ToggleViewMode toggles the view mode fill/full.
 func (a *APOD) ToggleViewMode() {
 }
 
+//DisplayCurrent reads the state file and sets the wallpaper accordingly.
 func (a *APOD) DisplayCurrent() error {
 	isodate, err := a.NowShowing()
 	if err != nil {
