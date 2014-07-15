@@ -21,7 +21,7 @@ const (
 	imgprefix = "apod-img-"
 )
 
-const setWallpaperScript = `#!/bin/bash
+const setWallpaperScriptBareWM = `#!/bin/bash
 feh --bg-max $WALLPAPER
 `
 
@@ -34,7 +34,7 @@ type Config struct {
 	SetWallpaper string
 }
 
-// LoadConfig loads the above Config or, failing that, throw an error. 
+// LoadConfig loads the above Config or, failing that, throw an error.
 func LoadConfig() (Config, error) {
 	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
 	err := os.MkdirAll(configDir, 0700)
@@ -51,7 +51,7 @@ func LoadConfig() (Config, error) {
 		if err != nil {
 			return Config{}, err
 		}
-		_, err = s.WriteString(setWallpaperScript)
+		_, err = s.WriteString(setWallpaperScriptBareWM)
 		if err != nil {
 			return Config{}, err
 		}
@@ -276,6 +276,7 @@ func (a *APOD) store(isodate string) error {
 	_, err = s.WriteString(isodate)
 	return err
 }
+
 // ToggleViewMode toggles the view mode fill/full.
 func (a *APOD) ToggleViewMode() {
 }
