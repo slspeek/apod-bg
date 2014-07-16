@@ -21,8 +21,11 @@ const (
 	imgprefix = "apod-img-"
 )
 
-const setWallpaperScriptBareWM = `#!/bin/bash
+const SetWallpaperScriptBareWM = `#!/bin/bash
 feh --bg-max $WALLPAPER
+`
+const SetWallpaperScriptLXDE = `#!/bin/bash
+pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=fit
 `
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
@@ -47,19 +50,7 @@ func LoadConfig() (Config, error) {
 		return Config{}, err
 	}
 	if !ok {
-		s, err := os.Create(scriptFile)
-		if err != nil {
-			return Config{}, err
-		}
-		_, err = s.WriteString(setWallpaperScriptBareWM)
-		if err != nil {
-			return Config{}, err
-		}
-		err = s.Close()
-		if err != nil {
-			return Config{}, err
-		}
-		err = os.Chmod(scriptFile, 0755)
+		err = WriteConfig(SetWallpaperScriptBareWM)
 		if err != nil {
 			return Config{}, err
 		}
@@ -71,6 +62,24 @@ func LoadConfig() (Config, error) {
 		return Config{}, err
 	}
 	return Config{StateFile: nowShowing, WallpaperDir: wallpaperDir, SetWallpaper: scriptFile}, nil
+}
+
+func WriteConfig(script string) error {
+	scriptFile := os.ExpandEnv("${HOME}/.config/apod-bg/set-wallpaper.sh")
+	s, err := os.Create(scriptFile)
+	if err != nil {
+		return err
+	}
+	_, err = s.WriteString(script)
+	if err != nil {
+		return err
+	}
+	err = s.Close()
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(scriptFile, 0755)
+	return err
 }
 
 type APOD struct {

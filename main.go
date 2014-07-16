@@ -9,11 +9,12 @@ import (
 )
 
 var (
-	info  = flag.Bool("info", false, "open the APOD-page on the current background")
-	login = flag.Bool("login", false, "Do the login procedure: fetch today and show it")
-	fetch = flag.Bool("fetch", false, "do a batch fetch from the past")
-	days  = flag.Int("days", 14, "days to go back downloading")
-	jump  = flag.Int("jump", 0, "number of images to jump")
+	info   = flag.Bool("info", false, "open the APOD-page on the current background")
+	login  = flag.Bool("login", false, "Do the login procedure: fetch today and show it")
+	fetch  = flag.Bool("fetch", false, "do a batch fetch from the past")
+	days   = flag.Int("days", 14, "days to go back downloading")
+	jump   = flag.Int("jump", 0, "number of images to jump")
+	config = flag.String("config", "", "configuration to write out")
 )
 
 func main() {
@@ -57,5 +58,18 @@ func main() {
 		}
 		fmt.Println("Jump was successfull\n")
 		return
+	}
+	if *config != "" {
+		script := ""
+		switch *config {
+		case "barewm":
+			script = apod.SetWallpaperScriptBareWM
+		case "lxde":
+			script = apod.SetWallpaperScriptLXDE
+		}
+		err = apod.WriteConfig(script)
+		if err != nil {
+			fmt.Printf("Could not write the configuration, because: %v\n", err)
+		}
 	}
 }
