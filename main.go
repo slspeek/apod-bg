@@ -66,6 +66,8 @@ func main() {
 			script = apod.SetWallpaperScriptBareWM
 		case "lxde":
 			script = apod.SetWallpaperScriptLXDE
+		case "gnome":
+			script = apod.SetWallpaperScriptGNOME
 		}
 		err = apod.WriteConfig(script)
 		if err != nil {

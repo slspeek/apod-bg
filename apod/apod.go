@@ -28,6 +28,10 @@ const SetWallpaperScriptLXDE = `#!/bin/bash
 pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=fit
 `
 
+const SetWallpaperScriptGNOME = `#!/bin/bash
+gsettings set org.gnome.desktop.background picture-uri file://$WALLPAPER
+`
+
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
 // Config sets where to find the image now showing, the wallpaper directory and the wallpaper to set.
