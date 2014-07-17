@@ -36,6 +36,10 @@ func main() {
 	}
 	if *login {
 		today := a.Today()
+		if downloaded := a.IsDownloaded(today); downloaded {
+			a.DisplayCurrent()
+			return
+		}
 		ok, err := a.Download(today)
 		if err != nil {
 			fmt.Printf("An error occurred during todays image downloading: %v\n", err)

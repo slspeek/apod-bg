@@ -192,6 +192,7 @@ func (a *APOD) download(url string, isodate string) error {
 // Download downloads the image from apod.nasa.gov for the given date.
 func (a *APOD) Download(isodate string) (bool, error) {
 	if downloaded := a.IsDownloaded(isodate); downloaded {
+		fmt.Printf("Not downloading %s\n", isodate)
 		return true, nil
 	}
 	pageURL := a.UrlForDate(isodate)
@@ -206,6 +207,7 @@ func (a *APOD) Download(isodate string) (bool, error) {
 	if err != nil {
 		return true, err
 	}
+	fmt.Printf("Success downloading %s\n", isodate)
 	return true, nil
 }
 
