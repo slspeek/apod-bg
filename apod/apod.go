@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -41,13 +42,18 @@ type Config struct {
 	SetWallpaper string
 }
 
-// LoadConfig loads the above Config or, failing that, throw an error.
-func LoadConfig() (Config, error) {
+func MakeConfigDirectory() error {
 	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
 	err := os.MkdirAll(configDir, 0700)
 	if err != nil {
-		return Config{}, err
+		return fmt.Errorf("Could not create configuration directory %q, because: %v\n", configDir, err)
 	}
+	return nil
+}
+
+// LoadConfig loads the above Config or, failing that, throw an error.
+func LoadConfig() (Config, error) {
+	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
 	scriptFile := filepath.Join(configDir, "set-wallpaper.sh")
 	ok, err := exists(scriptFile)
 	if err != nil {
@@ -90,6 +96,19 @@ type APOD struct {
 	Clock  clock.Clock
 	Config Config
 	Client *http.Client
+	Log    *log.Logger
+}
+
+func NewAPOD(logger *log.Logger) APOD {
+	cfg, err := LoadConfig()
+	if err != nil {
+		logger.Printf("Could not load the configuration, because: %v\n", err)
+	}
+	a := APOD{Config: cfg,
+		Clock:  clock.New(),
+		Client: http.DefaultClient,
+		Log:    logger}
+	return a
 }
 
 // Today returns the date of today in a formatted string.
@@ -172,27 +191,27 @@ func (a *APOD) IsDownloaded(isodate string) bool {
 	return fileExists
 }
 
-func (a *APOD) download(url string, isodate string) error {
+func (a *APOD) download(url string, isodate string) (string, error) {
 	file := a.fileName(isodate)
 	output, err := os.Create(file)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer output.Close()
 	resp, err := a.Client.Get(url)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	_, err = io.Copy(output, resp.Body)
-	return err
+	return file, err
 }
 
 // Download downloads the image from apod.nasa.gov for the given date.
 func (a *APOD) Download(isodate string) (bool, error) {
 	if downloaded := a.IsDownloaded(isodate); downloaded {
-		fmt.Printf("Not downloading %s\n", isodate)
+		a.Log.Printf("Not downloading %s, it already exits\n", isodate)
 		return true, nil
 	}
 	pageURL := a.UrlForDate(isodate)
@@ -203,11 +222,11 @@ func (a *APOD) Download(isodate string) (bool, error) {
 	if !success {
 		return false, nil
 	}
-	err = a.download(imgURL, isodate)
+	file, err := a.download(imgURL, isodate)
 	if err != nil {
 		return true, err
 	}
-	fmt.Printf("Success downloading %s\n", isodate)
+	a.Log.Printf("Successfully downloaded %s to %q\n", isodate, file)
 	return true, nil
 }
 
@@ -252,20 +271,21 @@ func (a *APOD) Jump(n int) error {
 	if err != nil {
 		return err
 	}
+	var idx int
 	now, err := a.NowShowing()
 	if err != nil {
-		return err
+		idx = 0
 	}
-	idx, err := a.IndexOf(now)
+	idx, err = a.IndexOf(now)
 	if err != nil {
 		return err
 	}
 	toGo := idx + n
 	if toGo >= len(all) || toGo < 0 {
-		return fmt.Errorf("Out of bounds")
+		return fmt.Errorf("Out of bounds: %d [0 ..(%d) .. %d] ", toGo, idx, len(all)-1)
 	}
 	newImageBaseName := all[toGo]
-	err = a.SetWallpaper(newImageBaseName[9:])
+	err = a.SetWallpaper(newImageBaseName[len(imgprefix):])
 	return err
 }
 

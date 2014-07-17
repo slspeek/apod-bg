@@ -2,7 +2,9 @@ package apod
 
 import (
 	"bufio"
+	"bytes"
 	"github.com/101loops/clock"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,11 +21,16 @@ func TestSetWallpaper(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(homeFile)
+	if err := MakeConfigDirectory(); err != nil {
+		t.Fatal(err)
+	}
 	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	apod := APOD{Config: cfg, Client: http.DefaultClient}
+	var buf bytes.Buffer
+	logger := log.New(&buf, "", log.LstdFlags)
+	apod := APOD{Config: cfg, Client: http.DefaultClient, Log: logger}
 	ok, err := apod.Download(testDateString)
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +54,8 @@ func spoofHome() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return homeFile, nil
+	err = os.Setenv("HOME", homeFile)
+	return homeFile, err
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -56,7 +64,9 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(homeFile)
-	err = os.Setenv("HOME", homeFile)
+	if err := MakeConfigDirectory(); err != nil {
+		t.Fatal(err)
+	}
 	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatal(err)
@@ -132,8 +142,20 @@ func TestContainsImage(t *testing.T) {
 }
 
 func TestDownload(t *testing.T) {
-	apod := APOD{Client: http.DefaultClient}
-	err := apod.download("http://apod.nasa.gov/apod/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
+	homeFile, err := spoofHome()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(homeFile)
+	if err := MakeConfigDirectory(); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	apod := APOD{Config: cfg, Client: http.DefaultClient}
+	_, err = apod.download("http://apod.nasa.gov/apod/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
 	if err != nil {
 		t.Fatal("could not load page")
 	}
