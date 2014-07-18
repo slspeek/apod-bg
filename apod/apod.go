@@ -23,6 +23,8 @@ const (
 	imgprefix          = "apod-img-"
 	stateFileBasename  = "now-showing"
 	configFileBasename = "config.json"
+	zoom               = "zoom"
+	fit                = "fit"
 )
 
 func configDir() string {
@@ -33,19 +35,34 @@ func stateFile() string {
 	return filepath.Join(configDir(), stateFileBasename)
 }
 
-func setWallpaper() string {
+func wallpaperSetScript() string {
 	return filepath.Join(configDir(), "set-wallpaper.sh")
 }
 
-const SetWallpaperScriptBareWM = `#!/bin/bash
-feh --bg-max $WALLPAPER
+const SetScriptBareWM = `#!/bin/bash
+if test $WALLPAPER_OPTIONS = zoom; then
+	feh --bg-fill $WALLPAPER
+else
+	feh --bg-max $WALLPAPER
+fi
 `
-const SetWallpaperScriptLXDE = `#!/bin/bash
-pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=fit
+const SetScriptLXDE = `#!/bin/bash
+if test $WALLPAPER_OPTIONS = zoom; then
+	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=stretch
+else
+	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=fit
+fi
 `
 
-const SetWallpaperScriptGNOME = `#!/bin/bash
+const SetScriptGNOME = `#!/bin/bash
 gsettings set org.gnome.desktop.background picture-uri file://$WALLPAPER
+if test $WALLPAPER_OPTIONS = zoom; then
+	gsettings set  org.gnome.desktop.background picture-options zoom
+else
+	gsettings set  org.gnome.desktop.background picture-options scaled
+fi
+gsettings set  org.gnome.desktop.background primary-color "000000"
+gsettings set  org.gnome.desktop.background secondary-color "000000"
 `
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
@@ -70,6 +87,7 @@ func MakeConfigDirectory() error {
 // LoadConfig loads the above Config or, failing that, throw an error.
 func LoadConfig() (Config, error) {
 	configDir := configDir()
+
 	configFile := filepath.Join(configDir, configFileBasename)
 	ok, err := exists(configFile)
 	if err != nil {
@@ -90,12 +108,12 @@ func LoadConfig() (Config, error) {
 		err = cfg.MakeWallpaperDir()
 		return cfg, err
 	} else {
-		ok, err := exists(setWallpaper())
+		ok, err := exists(wallpaperSetScript())
 		if err != nil {
 			return Config{}, err
 		}
 		if !ok {
-			err = WriteConfig(SetWallpaperScriptBareWM)
+			err = WriteWallpaperScript(SetScriptBareWM)
 			if err != nil {
 				return Config{}, err
 			}
@@ -113,13 +131,13 @@ func LoadConfig() (Config, error) {
 		}
 		enc := json.NewEncoder(f)
 		err = enc.Encode(cfg)
-		return Config{}, err
+		return cfg, err
 	}
 }
 
-func WriteConfig(script string) error {
-	scriptFile := os.ExpandEnv("${HOME}/.config/apod-bg/set-wallpaper.sh")
-	s, err := os.Create(scriptFile)
+func WriteWallpaperScript(script string) error {
+	file := wallpaperSetScript()
+	s, err := os.Create(file)
 	if err != nil {
 		return err
 	}
@@ -131,7 +149,7 @@ func WriteConfig(script string) error {
 	if err != nil {
 		return err
 	}
-	err = os.Chmod(scriptFile, 0755)
+	err = os.Chmod(file, 0755)
 	return err
 }
 
@@ -173,24 +191,28 @@ func (a *APOD) OpenAPODToday() error {
 
 // OpenAPODOnBackground opens the apod.nasa.gov page for the wallpaper now showing, or failing that, throws an error.
 func (a *APOD) OpenAPODOnBackground() error {
-	isodate, err := a.NowShowing()
+	s, err := a.State()
 	if err != nil {
 		return fmt.Errorf("Could not get hold on the picture that is currently shown, because: %v", err)
 	}
-	return a.OpenAPOD(isodate)
+	return a.OpenAPOD(s.DateCode)
 }
 
-// NowShowing returns isodate string YYMMDD.
-func (a *APOD) NowShowing() (string, error) {
+type State struct {
+	DateCode string
+	Options  string
+}
+
+// State returns the current State-struct
+func (a *APOD) State() (State, error) {
 	sf, err := os.Open(stateFile())
 	if err != nil {
-		return "", err
+		return State{}, err
 	}
-	bs, err := ioutil.ReadAll(sf)
-	if err != nil {
-		return "", err
-	}
-	return string(bs), nil
+	d := json.NewDecoder(sf)
+	var s State
+	err = d.Decode(&s)
+	return s, err
 }
 
 // LoadRecentPast loads images from apod.nasa.gov to the wallpaper dir, for a set number of days back, or throws error.
@@ -225,13 +247,13 @@ func exists(path string) (bool, error) {
 }
 
 // IsDownloaded checks whether an image file is downloaded for a given date.
-func (a *APOD) IsDownloaded(isodate string) bool {
+func (a *APOD) IsDownloaded(isodate string) (bool, error) {
 	file := a.fileName(isodate)
 	fileExists, err := exists(file)
 	if err != nil {
-		return true
+		return false, err
 	}
-	return fileExists
+	return fileExists, nil
 }
 
 func (a *APOD) download(url string, isodate string) (string, error) {
@@ -253,7 +275,7 @@ func (a *APOD) download(url string, isodate string) (string, error) {
 
 // Download downloads the image from apod.nasa.gov for the given date.
 func (a *APOD) Download(isodate string) (bool, error) {
-	if downloaded := a.IsDownloaded(isodate); downloaded {
+	if downloaded, _ := a.IsDownloaded(isodate); downloaded {
 		a.Log.Printf("Not downloading %s, it already exits\n", isodate)
 		return true, nil
 	}
@@ -315,11 +337,11 @@ func (a *APOD) Jump(n int) error {
 		return err
 	}
 	var idx int
-	now, err := a.NowShowing()
+	s, err := a.State()
 	if err != nil {
 		idx = 0
 	}
-	idx, err = a.IndexOf(now)
+	idx, err = a.IndexOf(s.DateCode)
 	if err != nil {
 		return err
 	}
@@ -327,41 +349,54 @@ func (a *APOD) Jump(n int) error {
 	if toGo >= len(all) || toGo < 0 {
 		return fmt.Errorf("Out of bounds: %d [0 ..(%d) .. %d] ", toGo, idx, len(all)-1)
 	}
-	newImageBaseName := all[toGo]
-	err = a.SetWallpaper(newImageBaseName[len(imgprefix):])
-	return err
+	code := all[toGo][len(imgprefix):]
+	st := State{DateCode: code, Options: fit}
+	return a.SetWallpaper(st)
 }
 
 // SetWallpaper sets the wallpaper to the image from the wallpaper directory for the given date.
-func (a *APOD) SetWallpaper(isodate string) error {
-	wallpaper := a.fileName(isodate)
-	cmd := exec.Command(setWallpaper())
+func (a *APOD) SetWallpaper(s State) error {
+	wallpaper := a.fileName(s.DateCode)
+	cmd := exec.Command(wallpaperSetScript())
 	env := os.Environ()
 	env = append(env, "WALLPAPER="+wallpaper)
+	env = append(env, "WALLPAPER_OPTIONS="+s.Options)
 	cmd.Env = env
 	err := cmd.Run()
 	if err != nil {
 		return err
 	}
-	return a.store(isodate)
+	return a.store(s)
 }
 
-func (a *APOD) store(isodate string) error {
-	s, err := os.Create(stateFile())
+func (a *APOD) store(s State) error {
+	f, err := os.Create(stateFile())
 	if err != nil {
 		return err
 	}
-	_, err = s.WriteString(isodate)
+	defer f.Close()
+	e := json.NewEncoder(f)
+	err = e.Encode(s)
 	return err
 }
 
 // ToggleViewMode toggles the view mode fill/full.
-func (a *APOD) ToggleViewMode() {
+func (a *APOD) ToggleViewMode() (string, error) {
+	s, err := a.State()
+	if err != nil {
+		return "", err
+	}
+	if s.Options == fit {
+		s.Options = zoom
+	} else {
+		s.Options = fit
+	}
+	return s.Options, a.SetWallpaper(s)
 }
 
-//DisplayCurrent reads the state file and sets the wallpaper accordingly.
+//DisplayCurrent reads the State file and sets the wallpaper accordingly.
 func (a *APOD) DisplayCurrent() error {
-	isodate, err := a.NowShowing()
+	isodate, err := a.State()
 	if err != nil {
 		return err
 	}

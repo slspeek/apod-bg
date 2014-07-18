@@ -17,6 +17,7 @@ var (
 	jump     = flag.Int("jump", 0, "number of images to jump")
 	config   = flag.String("config", "", "configuration to write out")
 	apodFlag = flag.Bool("apod", false, "open todays APOD-page")
+	toggle   = flag.Bool("mode", false, "toggle background sizing options: fit or zoom")
 )
 
 func main() {
@@ -49,16 +50,16 @@ func main() {
 		script := ""
 		switch *config {
 		case "barewm":
-			script = apod.SetWallpaperScriptBareWM
+			script = apod.SetScriptBareWM
 		case "lxde":
-			script = apod.SetWallpaperScriptLXDE
+			script = apod.SetScriptLXDE
 		case "gnome":
-			script = apod.SetWallpaperScriptGNOME
+			script = apod.SetScriptGNOME
 		default:
 			logf("Unknown configuration type: %s", *config)
 			return
 		}
-		err := apod.WriteConfig(script)
+		err := apod.WriteWallpaperScript(script)
 		if err != nil {
 			logf("Could not write the configuration, because: %v\n", err)
 		}
@@ -86,10 +87,14 @@ func main() {
 
 	if *login {
 		today := a.Today()
-		if downloaded := a.IsDownloaded(today); downloaded {
+		if downloaded, err := a.IsDownloaded(today); downloaded || err != nil {
+			if err != nil {
+				logf("Could not check whether today was downloaded, because: %v\n", err)
+				return
+			}
 			err := a.DisplayCurrent()
 			if err != nil {
-				logf("Could not display the current wallpaper, because: %v\n", err)
+				logf("Today was already downloaded, but could not display the current wallpaper, because: %v\n", err)
 			} else {
 				logf("Displayed the current wallpaper, as today was already downloaded\n")
 			}
@@ -101,7 +106,6 @@ func main() {
 		}
 		if !ok {
 			logf("No new image today (%s) on APOD\n", today)
-			a.DisplayCurrent()
 			err := a.DisplayCurrent()
 			if err != nil {
 				logf("Could not display the current wallpaper, because: %v\n", err)
@@ -110,7 +114,7 @@ func main() {
 			}
 			return
 		}
-		err = a.SetWallpaper(today)
+		err = a.SetWallpaper(apod.State{DateCode: today, Options: "fit"})
 		if err != nil {
 			logf("Could not set the wallpaper to %s, because: %v\n", today, err)
 		} else {
@@ -130,6 +134,16 @@ func main() {
 			return
 		}
 		logf("Jump was successfull\n")
+		return
+	}
+
+	if *toggle {
+		mode, err := a.ToggleViewMode()
+		if err != nil {
+			logf("Could not toggle viewing options: %v\n", err)
+		} else {
+			logf("Inversed the viewing option to: %s\n", mode)
+		}
 		return
 	}
 }

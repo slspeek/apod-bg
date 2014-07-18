@@ -62,7 +62,7 @@ func TestSetWallpaper(t *testing.T) {
 	if !ok {
 		t.Fatal("21 januari 2014 does contain an image on APOD")
 	}
-	err = apod.SetWallpaper(testDateString)
+	err = apod.SetWallpaper(State{DateCode: testDateString})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestUrlForDate(t *testing.T) {
 	}
 }
 
-func TestNowShowing(t *testing.T) {
+func TestState(t *testing.T) {
 	homeFile, err := spoofHome()
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func TestNowShowing(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not create file foo")
 	}
-	_, err = f.WriteString(`140121`)
+	_, err = f.WriteString(`{"DateCode":"140121","Options":"fit"}`)
 	if err != nil {
 		t.Fatal("could write to stateFile")
 	}
@@ -141,11 +141,11 @@ func TestNowShowing(t *testing.T) {
 
 	apod := APOD{}
 
-	rv, err := apod.NowShowing()
+	rv, err := apod.State()
 	if err != nil {
-		t.Fatalf("Error during call to NowShowing")
+		t.Fatalf("Error during call to State: %v\n", err)
 	}
-	if rv != testDateString {
+	if rv.DateCode != testDateString {
 		t.Errorf("Expected 140121, got %v", rv)
 	}
 }
