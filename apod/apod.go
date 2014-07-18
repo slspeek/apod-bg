@@ -17,10 +17,23 @@ import (
 )
 
 const (
-	apodBase  = "http://apod.nasa.gov/apod/"
-	format    = "060102"
-	imgprefix = "apod-img-"
+	apodBase          = "http://apod.nasa.gov/apod/"
+	format            = "060102"
+	imgprefix         = "apod-img-"
+	stateFileBasename = "now-showing"
 )
+
+func configDir() string {
+	return os.ExpandEnv("${HOME}/.config/apod-bg")
+}
+
+func stateFile() string {
+	return filepath.Join(configDir(), stateFileBasename)
+}
+
+func setWallpaper() string {
+	return filepath.Join(configDir(), "set-wallpaper.sh")
+}
 
 const SetWallpaperScriptBareWM = `#!/bin/bash
 feh --bg-max $WALLPAPER
@@ -37,14 +50,11 @@ var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
 // Config sets where to find the image now showing, the wallpaper directory and the wallpaper to set.
 type Config struct {
-	StateFile    string
 	WallpaperDir string
-	SetWallpaper string
 }
 
 func MakeConfigDirectory() error {
-	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
-	err := os.MkdirAll(configDir, 0700)
+	err := os.MkdirAll(configDir(), 0700)
 	if err != nil {
 		return fmt.Errorf("Could not create configuration directory %q, because: %v\n", configDir, err)
 	}
@@ -54,8 +64,7 @@ func MakeConfigDirectory() error {
 // LoadConfig loads the above Config or, failing that, throw an error.
 func LoadConfig() (Config, error) {
 	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
-	scriptFile := filepath.Join(configDir, "set-wallpaper.sh")
-	ok, err := exists(scriptFile)
+	ok, err := exists(setWallpaper())
 	if err != nil {
 		return Config{}, err
 	}
@@ -65,13 +74,12 @@ func LoadConfig() (Config, error) {
 			return Config{}, err
 		}
 	}
-	nowShowing := filepath.Join(configDir, "now-showing")
 	wallpaperDir := filepath.Join(configDir, "wallpapers")
 	err = os.MkdirAll(wallpaperDir, 0700)
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{StateFile: nowShowing, WallpaperDir: wallpaperDir, SetWallpaper: scriptFile}, nil
+	return Config{WallpaperDir: wallpaperDir}, nil
 }
 
 func WriteConfig(script string) error {
@@ -139,7 +147,7 @@ func (a *APOD) OpenAPODOnBackground() error {
 
 // NowShowing returns isodate string YYMMDD.
 func (a *APOD) NowShowing() (string, error) {
-	sf, err := os.Open(a.Config.StateFile)
+	sf, err := os.Open(stateFile())
 	if err != nil {
 		return "", err
 	}
@@ -292,7 +300,7 @@ func (a *APOD) Jump(n int) error {
 // SetWallpaper sets the wallpaper to the image from the wallpaper directory for the given date.
 func (a *APOD) SetWallpaper(isodate string) error {
 	wallpaper := a.fileName(isodate)
-	cmd := exec.Command(a.Config.SetWallpaper)
+	cmd := exec.Command(setWallpaper())
 	env := os.Environ()
 	env = append(env, "WALLPAPER="+wallpaper)
 	cmd.Env = env
@@ -304,7 +312,7 @@ func (a *APOD) SetWallpaper(isodate string) error {
 }
 
 func (a *APOD) store(isodate string) error {
-	s, err := os.Create(a.Config.StateFile)
+	s, err := os.Create(stateFile())
 	if err != nil {
 		return err
 	}

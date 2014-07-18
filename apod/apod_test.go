@@ -3,6 +3,7 @@ package apod
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"github.com/101loops/clock"
 	"log"
 	"net/http"
@@ -14,6 +15,29 @@ import (
 )
 
 const testDateString = "140121"
+
+func TestMarshalConfig(t *testing.T) {
+	cfg := Config{WallpaperDir: "bar"}
+	text, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(text) != `{"WallpaperDir":"bar"}` {
+		t.Fatal("Not well ")
+	}
+}
+
+func TestUnmarshalConfig(t *testing.T) {
+	var jsonBlob = []byte(`{"WallpaperDir":"bar"}`)
+	var cfg Config
+	err := json.Unmarshal(jsonBlob, &cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.WallpaperDir != "bar" {
+		t.Fatal("Not well ")
+	}
+}
 
 func TestSetWallpaper(t *testing.T) {
 	homeFile, err := spoofHome()
@@ -94,22 +118,28 @@ func TestUrlForDate(t *testing.T) {
 }
 
 func TestNowShowing(t *testing.T) {
-	f, err := os.Create("foo")
+	homeFile, err := spoofHome()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(homeFile)
+	if err := MakeConfigDirectory(); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Create(stateFile())
 	if err != nil {
 		t.Fatal("could not create file foo")
 	}
-	defer os.Remove("foo")
 	_, err = f.WriteString(`140121`)
 	if err != nil {
-		t.Fatal("could write to file  foo")
+		t.Fatal("could write to stateFile")
 	}
 	err = f.Close()
 	if err != nil {
-		t.Fatal("could close file foo")
+		t.Fatal("could close StateFile")
 	}
-	cfg := Config{StateFile: "foo"}
 
-	apod := APOD{Config: cfg}
+	apod := APOD{}
 
 	rv, err := apod.NowShowing()
 	if err != nil {
@@ -246,8 +276,7 @@ func TestFileName(t *testing.T) {
 }
 
 func TestLoadPage(t *testing.T) {
-	cfg := Config{StateFile: "foo"}
-	apod := APOD{Config: cfg, Client: &http.Client{Transport: loopback{}}}
+	apod := APOD{Client: &http.Client{Transport: loopback{}}}
 	page, err := apod.loadPage("http://apod.nasa.gov/apod/astropix.html")
 	if err != nil {
 		t.Fatalf("Error loading page: %v", err)
