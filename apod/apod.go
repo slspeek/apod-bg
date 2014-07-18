@@ -1,6 +1,7 @@
 package apod
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,10 +18,11 @@ import (
 )
 
 const (
-	apodBase          = "http://apod.nasa.gov/apod/"
-	format            = "060102"
-	imgprefix         = "apod-img-"
-	stateFileBasename = "now-showing"
+	apodBase           = "http://apod.nasa.gov/apod/"
+	format             = "060102"
+	imgprefix          = "apod-img-"
+	stateFileBasename  = "now-showing"
+	configFileBasename = "config.json"
 )
 
 func configDir() string {
@@ -53,6 +55,10 @@ type Config struct {
 	WallpaperDir string
 }
 
+func (c *Config) MakeWallpaperDir() error {
+	return os.MkdirAll(c.WallpaperDir, 0700)
+}
+
 func MakeConfigDirectory() error {
 	err := os.MkdirAll(configDir(), 0700)
 	if err != nil {
@@ -63,23 +69,52 @@ func MakeConfigDirectory() error {
 
 // LoadConfig loads the above Config or, failing that, throw an error.
 func LoadConfig() (Config, error) {
-	configDir := os.ExpandEnv("${HOME}/.config/apod-bg")
-	ok, err := exists(setWallpaper())
+	configDir := configDir()
+	configFile := filepath.Join(configDir, configFileBasename)
+	ok, err := exists(configFile)
 	if err != nil {
 		return Config{}, err
 	}
-	if !ok {
-		err = WriteConfig(SetWallpaperScriptBareWM)
+	if ok {
+		f, err := os.Open(configFile)
 		if err != nil {
 			return Config{}, err
 		}
-	}
-	wallpaperDir := filepath.Join(configDir, "wallpapers")
-	err = os.MkdirAll(wallpaperDir, 0700)
-	if err != nil {
+		defer f.Close()
+		dec := json.NewDecoder(f)
+		var cfg Config
+		err = dec.Decode(&cfg)
+		if err != nil {
+			return Config{}, err
+		}
+		err = cfg.MakeWallpaperDir()
+		return cfg, err
+	} else {
+		ok, err := exists(setWallpaper())
+		if err != nil {
+			return Config{}, err
+		}
+		if !ok {
+			err = WriteConfig(SetWallpaperScriptBareWM)
+			if err != nil {
+				return Config{}, err
+			}
+		}
+		wallpaperDir := filepath.Join(configDir, "wallpapers")
+
+		cfg := Config{WallpaperDir: wallpaperDir}
+		err = cfg.MakeWallpaperDir()
+		if err != nil {
+			return Config{}, err
+		}
+		f, err := os.Create(configFile)
+		if err != nil {
+			return Config{}, err
+		}
+		enc := json.NewEncoder(f)
+		err = enc.Encode(cfg)
 		return Config{}, err
 	}
-	return Config{WallpaperDir: wallpaperDir}, nil
 }
 
 func WriteConfig(script string) error {

@@ -40,9 +40,9 @@ func main() {
 		logger = log.New(f, "", log.LstdFlags|log.Lshortfile)
 		a = apod.NewAPOD(logger)
 	}
-	var logf = func(pat string, args ...interface{}) {
-		log.Printf(pat, args)
-		logger.Printf(pat, args)
+	var logf = func(format string, args ...interface{}) {
+		fmt.Printf(format, args...)
+		logger.Printf(format, args...)
 	}
 
 	if *config != "" {
