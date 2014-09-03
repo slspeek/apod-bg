@@ -103,7 +103,7 @@ func spoofHome() (string, error) {
 	return homeFile, err
 }
 
-func TestLoadConfig(t *testing.T) {
+func TestLoadConfigNonExistent(t *testing.T) {
 	homeFile, err := spoofHome()
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +112,30 @@ func TestLoadConfig(t *testing.T) {
 	if err := MakeConfigDir(); err != nil {
 		t.Fatal(err)
 	}
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(cfg)
+}
+
+func TestLoadConfigExistent(t *testing.T) {
+	homeFile, err := spoofHome()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(homeFile)
+	if err := MakeConfigDir(); err != nil {
+		t.Fatal(err)
+	}
+	cfgFile := filepath.Join(configDir(), configFileBasename)
+	f, err := os.Create(cfgFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Write([]byte(`{"WallpaperDir":"bar"}`))
+	f.Close()
+
 	cfg, err := LoadConfig()
 	if err != nil {
 		t.Fatal(err)

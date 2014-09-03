@@ -67,7 +67,7 @@ gsettings set  org.gnome.desktop.background secondary-color "000000"
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
-// Config sets where to find the image now showing, the wallpaper directory and the wallpaper to set.
+// Config sets where to find the wallpaper directory.
 type Config struct {
 	WallpaperDir string
 }
@@ -86,52 +86,51 @@ func MakeConfigDir() error {
 
 // LoadConfig loads a Config from disk or, failing that, returns an error.
 func LoadConfig() (Config, error) {
+	c := Config{}
 	configDir := configDir()
 
 	configFile := filepath.Join(configDir, configFileBasename)
-	ok, err := exists(configFile)
+	cfgExists, err := exists(configFile)
 	if err != nil {
-		return Config{}, err
+		return c, err
 	}
-	if ok {
+	if cfgExists {
 		f, err := os.Open(configFile)
 		if err != nil {
-			return Config{}, err
+			return c, err
 		}
 		defer f.Close()
 		dec := json.NewDecoder(f)
-		var cfg Config
-		err = dec.Decode(&cfg)
+		err = dec.Decode(&c)
 		if err != nil {
-			return Config{}, err
+			return c, err
 		}
-		err = cfg.MakeWallpaperDir()
-		return cfg, err
+		err = c.MakeWallpaperDir()
+		return c, err
 	} else {
 		ok, err := exists(wallpaperSetScript())
 		if err != nil {
-			return Config{}, err
+			return c, err
 		}
 		if !ok {
 			err = WriteWallpaperScript(SetScriptBareWM)
 			if err != nil {
-				return Config{}, err
+				return c, err
 			}
 		}
 		wallpaperDir := filepath.Join(configDir, "wallpapers")
-
-		cfg := Config{WallpaperDir: wallpaperDir}
-		err = cfg.MakeWallpaperDir()
+		c.WallpaperDir = wallpaperDir
+		err = c.MakeWallpaperDir()
 		if err != nil {
-			return Config{}, err
+			return c, err
 		}
 		f, err := os.Create(configFile)
 		if err != nil {
-			return Config{}, err
+			return c, err
 		}
 		enc := json.NewEncoder(f)
-		err = enc.Encode(cfg)
-		return cfg, err
+		err = enc.Encode(c)
+		return c, err
 	}
 }
 
@@ -200,6 +199,7 @@ func (a *APOD) OpenAPODOnBackground() error {
 	return a.OpenAPOD(s.DateCode)
 }
 
+// State defines the date of the apod-image being shown and display options
 type State struct {
 	DateCode string
 	Options  string
