@@ -79,7 +79,7 @@ func (c *Config) MakeWallpaperDir() error {
 func MakeConfigDir() error {
 	err := os.MkdirAll(configDir(), 0700)
 	if err != nil {
-		return fmt.Errorf("Could not create configuration directory %q, because: %v\n", configDir, err)
+		return fmt.Errorf("Could not create configuration directory %q, because: %v\n", configDir(), err)
 	}
 	return nil
 }
