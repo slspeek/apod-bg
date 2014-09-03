@@ -24,7 +24,7 @@ func main() {
 	flag.Parse()
 	fmt.Println("This is APOD Background")
 	{
-		err := apod.MakeConfigDirectory()
+		err := apod.MakeConfigDir()
 		if err != nil {
 			fmt.Println(err.Error())
 		}

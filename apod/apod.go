@@ -76,7 +76,7 @@ func (c *Config) MakeWallpaperDir() error {
 	return os.MkdirAll(c.WallpaperDir, 0700)
 }
 
-func MakeConfigDirectory() error {
+func MakeConfigDir() error {
 	err := os.MkdirAll(configDir(), 0700)
 	if err != nil {
 		return fmt.Errorf("Could not create configuration directory %q, because: %v\n", configDir, err)
@@ -84,7 +84,7 @@ func MakeConfigDirectory() error {
 	return nil
 }
 
-// LoadConfig loads the above Config or, failing that, throw an error.
+// LoadConfig loads a Config from disk or, failing that, returns an error.
 func LoadConfig() (Config, error) {
 	configDir := configDir()
 
@@ -153,6 +153,7 @@ func WriteWallpaperScript(script string) error {
 	return err
 }
 
+// APOD encapsulates commuticating with apod.nasa.gov
 type APOD struct {
 	Clock  clock.Clock
 	Config Config
@@ -160,10 +161,11 @@ type APOD struct {
 	Log    *log.Logger
 }
 
+// NewAPOD constructs a new APOD object
 func NewAPOD(logger *log.Logger) APOD {
 	cfg, err := LoadConfig()
 	if err != nil {
-		logger.Printf("Could not load the configuration, because: %v\n", err)
+		logger.Fatalf("Could not load the configuration, because: %v\n", err)
 	}
 	a := APOD{Config: cfg,
 		Clock:  clock.New(),

@@ -15,27 +15,28 @@ import (
 )
 
 const testDateString = "140121"
+const configJSON = `{"WallpaperDir":"bar"}`
 
 func TestMarshalConfig(t *testing.T) {
 	cfg := Config{WallpaperDir: "bar"}
 	text, err := json.Marshal(cfg)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to write Config object to json: %v", err)
 	}
-	if string(text) != `{"WallpaperDir":"bar"}` {
-		t.Fatal("Not well ")
+	if string(text) != configJSON {
+		t.Fatal("json has unexpected value")
 	}
 }
 
 func TestUnmarshalConfig(t *testing.T) {
-	var jsonBlob = []byte(`{"WallpaperDir":"bar"}`)
+	var jsonBlob = []byte(configJSON)
 	var cfg Config
 	err := json.Unmarshal(jsonBlob, &cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.WallpaperDir != "bar" {
-		t.Fatal("Not well ")
+		t.Fatal("Read unexpected value")
 	}
 }
 
@@ -45,7 +46,7 @@ func TestSetWallpaper(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDirectory(); err != nil {
+	if err := MakeConfigDir(); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadConfig()
@@ -88,7 +89,7 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDirectory(); err != nil {
+	if err := MakeConfigDir(); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadConfig()
@@ -123,7 +124,7 @@ func TestState(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDirectory(); err != nil {
+	if err := MakeConfigDir(); err != nil {
 		t.Fatal(err)
 	}
 	f, err := os.Create(stateFile())
@@ -150,9 +151,9 @@ func TestState(t *testing.T) {
 	}
 }
 
-type loopback struct{}
+type apodRoundTrip struct{}
 
-func (l loopback) RoundTrip(*http.Request) (*http.Response, error) {
+func (l apodRoundTrip) RoundTrip(*http.Request) (*http.Response, error) {
 	resp, err := http.ReadResponse(bufio.NewReader(strings.NewReader(apodResponse)), nil)
 	if err != nil {
 		return nil, err
@@ -161,7 +162,7 @@ func (l loopback) RoundTrip(*http.Request) (*http.Response, error) {
 }
 
 func TestContainsImage(t *testing.T) {
-	apod := APOD{Client: &http.Client{Transport: loopback{}}}
+	apod := APOD{Client: &http.Client{Transport: apodRoundTrip{}}}
 	_, url, err := apod.ContainsImage("http://apod.nasa.gov/apod/astropix.html")
 	if err != nil {
 		t.Fatal("could not load page")
@@ -177,7 +178,7 @@ func TestDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDirectory(); err != nil {
+	if err := MakeConfigDir(); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadConfig()
@@ -276,7 +277,7 @@ func TestFileName(t *testing.T) {
 }
 
 func TestLoadPage(t *testing.T) {
-	apod := APOD{Client: &http.Client{Transport: loopback{}}}
+	apod := APOD{Client: &http.Client{Transport: apodRoundTrip{}}}
 	page, err := apod.loadPage("http://apod.nasa.gov/apod/astropix.html")
 	if err != nil {
 		t.Fatalf("Error loading page: %v", err)
@@ -423,3 +424,67 @@ Privacy Policy and Important Notices</a><br>
 </body>
 </html>
 `
+
+const imageResponseBase64 = `
+begin-base64 644 IMAGE_RESPONSE
+ICBIVFRQLzEuMSAyMDAgT0sKICBEYXRlOiBXZWQsIDAzIFNlcCAyMDE0IDE4
+OjIyOjI3IEdNVAogIFNlcnZlcjogU3F1ZWVnaXQvMS4yLjUgKDNfc2lyKQog
+IFZhcnk6ICoKICBYLVNlcnZlci1JUDogMjA5LjIwMi4yNDQuMTk1CiAgUDNQ
+OiBwb2xpY3lyZWY9Imh0dHA6Ly93d3cubHljb3MuY29tL3czYy9wM3AueG1s
+IiwgQ1A9IklEQyBEU1AgQ09SIENVUmEgQURNYSBERVZhIENVU2EgUFNBYSBJ
+VkFhIENPTm8gT1VSIElORCBVTkkgU1RBIgogIENhY2hlLUNvbnRyb2w6IG1h
+eC1hZ2U9NjA0ODAwCiAgRXhwaXJlczogV2VkLCAxMCBTZXAgMjAxNCAxODoy
+MjoyNyBHTVQKICBMYXN0LU1vZGlmaWVkOiBUdWUsIDI4IFNlcCAxOTk5IDEw
+OjMwOjIwIEdNVAogIEVUYWc6ICI4ODktMzdmMDk4YmMiCiAgQWNjZXB0LVJh
+bmdlczogYnl0ZXMKICBDb250ZW50LUxlbmd0aDogMjE4NQogIENvbm5lY3Rp
+b246IGNsb3NlCiAgQ29udGVudC1UeXBlOiBpbWFnZS9naWYKR0lGODlhMgAy
+APcAAAAAAAgIAAgICBAIABAQABAQCBAQEBgYABgYCBgYEBgYGCEhCCEhECEh
+GCEhISkpCCkpECkpISkpKTExITExKTExMTkxGDk5ITk5KTk5MTk5OUJCKUJC
+MUJCOUpCQkpKOUpKQkpKSlJSKVJSSlJSUlpaUlpaWmNjMWNjUmNjWmNjY2tr
+WmtrY2tra3Nzc3tza3t7Wnt7a3t7c3t7e4R7c4SEWoSEe4SEhISEjIyEhIyM
+c4yMhIyMjIyMlJSMhJSMjJSMlJSUjJSUlJyUjJyUlJychJycjJyclJycnJyc
+paWclKWcnKWcpaWlhKWlnKWlpaWlra2lnK2lpa2lra2tpa2tra2ttbWtpbWt
+rbWttbW1nLW1pbW1rbW1tb21rb21tb21vb29pb29rb29tb29vb29xsa9tca9
+vca9xsbGtcbGvcbGxsbGzs7Gvc7Gxs7Gzs7Ovc7Oxs7Ozs7O1tbOxtbOztbO
+1tbWxtbWztbW1tbW3t7Wzt7W1t7W3t7ezt7e1t7e3ufe1ufe3ufe5+fn1ufn
+3ufn5+fn7+/n3u/n5+/n7+/v3u/v5+/v7+/v9/fv5/fv7/fv9/f37/f39/f3
+///39//3////9///////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+/////////ywAAAAAMgAyAAAI/gABCBxIsKDBgwgTKlzIsKHDhxRIuJhB8QYP
+GSUoPNxIUEGIGU+ydCHD5ssZMifZnMlyI0QBjgwLsICSBeUZOWzw4PyDM06e
+P3jYkEkRACbCEEiekGQjByeeoHTY8PkyBk8eOVblfPlglKADFkSedMmpRg2Z
+OHHcxFHjZYuXsj7j5OS5A0FXCkKeUJFSlkyUJ16oovVCh08hQ4gTJTLE0w0b
+LhdgQgCCpEqXMWrUni3MGLGkRn8MPW1kqBGlRnx4qnmwEYMQJFyqVI3z1E2h
+SZga6cZdKA6d37TVxMGEydBVMpEbOuDxBLCanGxo4/lDvLokSbTR0lEzZq2h
+3H/+/rDxwnphABlLpJw9AzTtdDyJqhPnIzrN0zhpzKRR00hSIkDiGcFQCUg4
+kUVUdDz1Fh8MYjIJbqTd1luCeODnRht0JNLIfzydoJADRFCRxRpAHZJIHFwI
+F4duvz34xyOTIOLbH3ughQcfdISm4SFyjHFAQjN18YVUgEyyGB6N9EajkpP8
+8aCMdOxB4x6/hVbahjzVgJADQlBBBh505PEgJhoWUlV4NL74nYON7FEIIn78
+UYhhjcBIJiBBlVfQCHqRhIchkYzZCFt/IlKInA/amdskoIW3h2GGSEJcIjyh
+cJANTywB2HROEjeJcHg8Qtoegcjn4COPGJLqI35MQuek/nnEUYRBDfDgBA9K
+DGlIIpNEKokaYBaCyR9xNmLdHqWtGlqMhRjr3x9ufPEjQRkIscQOR1zBx6T0
+TRJsIZK8eZ18kT44SaqSpHobJs/icYYIezYXRLbfJTnGodPRURpukuZmqqcO
+Oiisg6LJcUYMBcmgFBFKcMHoJGsluMd0/Ur62biS4PbvucQZgi8bTRAUAA4h
+kXEFdYW44cUYbci5pKQQSmJIk6VqLN8k/SaJmBtXFCVQATwc8YRPjQAShyFt
+YIjHYYEM7KnGDxq7cXWMFqJTGD4DYABzXLDRXiIVggmUqI/0CzBxkuzxSHFj
+mprqHwluQcBABdzQnJBSuOEx/h1WA4UHIvH9S7AfjZxrs7mYHPoHWltkDcAN
+Ql/hRIpH/ynJU2NvjAgiGV/sYMzhLo2HG3hcUdAMSGQhxRVXCLctcU8F0p/g
+jzDy9KmF48x0eG7kEURBLFQmBRetsyH1JFabLbjgjSDS3yOhhYcWIAgTFMIS
+ZMhB/FsDfxbe8v92vwdu0PftNSAcFBSBEFWw0cUVXMQR+GfN2jx1k9Q12l9n
+7yUyx0siu0F6hiccnAElXMuTWnX+0B8pSakzjAoNII5wkBII4QhSoMJ0IhEJ
+PKjhD5QAX3XqtAdE7KF5icPDuBqBB0AAwgQHccAOiFAFLnQhPJMgQxrioLzl
+NUlK/of6zmFukzFAJEIOCkBIC4SQhTi0zzBkuFcPpxaeHIGLXZ/64IbyMIOE
+RIAHVTgDe0TTGREGrElR4gPZWOiGDDXiEGQAIEJM8ISbuNAQR4sUcShhP0/J
+jA5Ju4OqFsOHOPBhizBUSABu0L6fyOEPfIhPCO93rt8UhjTGOpSR9ICEhuAl
+C3LIg9cO8QdemQpCh0OE7ZBHh9NoCBBgSGJDQICELvQkPEa0mbOuw69FMSox
+hQCEHtiQgY1woEskkYMLFTMmIzEqPjjDYuGmaZwzOAAmHuAB9kL5k0E0IlAa
++kMkeKUhSVDCnEYqmhzI4IGuZAB1YGBDHvIAiEMwBhC7c0rMrqapmEOIcgnX
+7AoACtCC1CXTKnl4D4AoZYhD4GkQwyRDDOQoUABQwAZJoMJYosPNPJwBEPJE
+qEqC0ICKHgQDYNHoSMBAEjKQwQ1nGMkTVlBMkyakABhIAQ2SkqknQOEIOljB
+BBxn06Ia9ahITSpBAgIAOw==
+====`
