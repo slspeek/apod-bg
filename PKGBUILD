@@ -35,6 +35,6 @@ package() {
 	cd "$srcdir/src/$_gourl"
 	install -Dm644 "README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
 	install -Dm644 "i3wm.config" "$pkgdir/usr/share/doc/$pkgname/i3wm.config"
-	install -Dm644	"apod-bg.man" "$pkgdir/usr/share/man/man1"
+	install -Dm644	"apod-bg.man" "$pkgdir/usr/share/man/man1/apod-bg.1"
 }
 md5sums=('SKIP')
