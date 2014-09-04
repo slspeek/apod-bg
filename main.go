@@ -11,12 +11,12 @@ import (
 
 var (
 	info     = flag.Bool("info", false, "open the APOD-page on the current background")
-	login    = flag.Bool("login", false, "do the login procedure: fetch today and show it")
+	login    = flag.Bool("login", false, "do the procedure for a graphical login: download todays image and display it")
 	logfile  = flag.String("log", os.ExpandEnv("${HOME}/.config/apod-bg/apod-bg.log"), "logfile specification")
 	days     = flag.Int("fetch", 0, "days to go back downloading")
-	jump     = flag.Int("jump", 0, "number of images to jump")
-	config   = flag.String("config", "", "configuration to write out")
-	apodFlag = flag.Bool("apod", false, "open todays APOD-page")
+	jump     = flag.Int("jump", 0, "jump N backgrounds further, use negative numbers to jump backward")
+	config   = flag.String("config", "", "initializes apod-bg for chosen window-manager")
+	apodFlag = flag.Bool("apod", false, "opens the default browser on the Astronomy Picture of The Day")
 	toggle   = flag.Bool("mode", false, "toggle background sizing options: fit or zoom")
 )
 

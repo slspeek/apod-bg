@@ -1,0 +1,58 @@
+.\" Manpage for apod-bg
+.\" Contact slspeek@gmail.com to correct errors or typos.
+.TH man 1 "4 Sep 2014" "1.0" "apod-bg man page"
+.SH NAME
+apod-bg \- downloads and set as wallpaper images from Astronomy Picture of The Day
+.SH SYNOPSIS
+apod-bg <-apod|-config=<barewm|gnome|lxde>|-fetch=N|-info|-jump=[-]N|-log=logfile|-login|-mode>
+.SH DESCRIPTION
+Downloads and displays NASA Astronomy Picture of The Day as wallpaper.
+.SH OPTIONS
+.TP
+\-apod
+opens default browser on the Astronomy Picture of The Day
+.TP
+\-config=<barewm|gnome|lxde>
+initializes apod-bg for chosen window-manager
+.TP
+\-fetch=<count>
+days to go back downloading
+.TP
+\-info
+open the APOD-page on the current background
+.TP
+\-jump=N
+jump N backgrounds further, use negative numbers to jump backward
+.TP
+\-log=path/to/logfile
+overrides the default log file location which is $HOME/.config/apod-bg/apod-bg.log
+.TP
+\-login
+do the procedure for a graphical login: download todays image and display it
+\-mode
+toggle background sizing options: fit or zoom
+.SH EXAMPLES
+.TP
+Configure your window-manager for apod-bg to be a bare window-manager like awesome, i3 or twm
+.B apod-bg
+\-config=barewm
+.PP
+.TP
+Login option is used when calling apod-bg in your ~/.xinit or session-startup-programs.
+.B apod-bg
+\-login
+.PP
+.SH FILES
+.B $HOME/.config/apod-bg/config.json
+.TP
+contains the configurable option WallpaperDir
+.SH CONFIGURATION OF SHORTCUTS
+See /user/share/doc/apod-bg/i3wm.config for an example on how to configure your wm.
+.SH EXIT STATUS
+returns a zero status if it succeeds. Non zero is returned in case of failure.
+.SH SEE ALSO
+feh(1), pcmanfm(1), i3(1)
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+Steven L. Speek (slspeek@gmail.com)
