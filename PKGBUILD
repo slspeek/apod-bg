@@ -8,7 +8,6 @@ arch=('x86_64' 'i686')
 url="https://github.com/slspeek/apod-bg"
 license=('gpl3')
 makedepends=('git' 'go')
-depends=('xdg-utils')
 optdepends=(
 'feh: bare window-manager support'
 'pcmanfm: lxde support'
@@ -37,4 +36,3 @@ package() {
 	install -Dm644 "i3wm.config" "$pkgdir/usr/share/doc/$pkgname/i3wm.config"
 	install -Dm644	"apod-bg.man" "$pkgdir/usr/share/man/man1/apod-bg.1"
 }
-md5sums=('SKIP')
