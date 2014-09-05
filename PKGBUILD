@@ -1,7 +1,7 @@
 # Maintainer: Steven Speek <slspeek@gmail.com>
 
-pkgname=apod-bg
-pkgver=1.2
+pkgname=apod-bg-dev
+pkgver=$(date +"%Y%m%d.%H.%M.%S")
 pkgrel=1
 pkgdesc="Automatically sets your background to the new Astronomy Picture Of the Day"
 arch=('x86_64' 'i686')

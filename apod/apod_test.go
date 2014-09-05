@@ -2,8 +2,6 @@ package apod
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"github.com/101loops/clock"
 	"io/ioutil"
 	"log"
@@ -18,8 +16,34 @@ import (
 
 const testDateString = "140121"
 const configJSON = `{"WallpaperDir":"bar"}`
+const setScriptSuccess = `#!/bin/bash
+exit 0
+`
+const setScriptFailure = `#!/bin/bash
+exit 5
+`
 
-func TestFoo(t *testing.T) {
+func apodForTest(t http.RoundTripper) (*APOD, string, error) {
+	homeDir, err := spoofHome()
+	if err != nil {
+		return nil, "", err
+	}
+	a := new(APOD)
+	a.Log = log.New(os.Stdout, "", log.LstdFlags)
+	a.Client = &http.Client{Transport: t}
+	return a, homeDir, err
+}
+
+func apodForTestConfigured(t http.RoundTripper) (*APOD, string, error) {
+	a, homeDir, err := apodForTest(t)
+	if err != nil {
+		return nil, homeDir, err
+	}
+	err = a.Configure("barewm")
+	return a, homeDir, err
+}
+
+func TestCollectTestData(t *testing.T) {
 	t.Skip()
 	resp, err := http.Get("http://timbeauchamp.tripod.com/moon/moon15.gif")
 	if err != nil {
@@ -37,54 +61,42 @@ func TestFoo(t *testing.T) {
 	}
 }
 
-func TestMarshalConfig(t *testing.T) {
-	cfg := Config{WallpaperDir: "bar"}
-	text, err := json.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("Failed to write Config object to json: %v", err)
-	}
-	if string(text) != configJSON {
-		t.Fatal("json has unexpected value")
-	}
-}
-
-func TestUnmarshalConfig(t *testing.T) {
-	var jsonBlob = []byte(configJSON)
-	var cfg Config
-	err := json.Unmarshal(jsonBlob, &cfg)
+func TestSetWallpaperSuccess(t *testing.T) {
+	a, homeDir, err := apodForTestConfigured(testRoundTrip{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.WallpaperDir != "bar" {
-		t.Fatal("Read unexpected value")
-	}
-}
-
-func TestSetWallpaper(t *testing.T) {
-	homeFile, err := spoofHome()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDir(); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := LoadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var buf bytes.Buffer
-	logger := log.New(&buf, "", log.LstdFlags)
-	apod := APOD{Config: cfg, Client: &http.Client{Transport: testRoundTrip{}}, Log: logger}
-	ok, err := apod.Download(testDateString)
+	defer os.RemoveAll(homeDir)
+	writeWallpaperScript(setScriptSuccess)
+	ok, err := a.Download(testDateString)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !ok {
 		t.Fatal("21 januari 2014 does contain an image on APOD")
 	}
-	err = apod.SetWallpaper(State{DateCode: testDateString})
+	err = a.SetWallpaper(State{DateCode: testDateString})
 	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSetWallpaperFailure(t *testing.T) {
+	a, homeDir, err := apodForTestConfigured(testRoundTrip{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(homeDir)
+	writeWallpaperScript(setScriptFailure)
+	ok, err := a.Download(testDateString)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("21 januari 2014 does contain an image on APOD")
+	}
+	err = a.SetWallpaper(State{DateCode: testDateString})
+	if err.Error() != "exit status 5" {
 		t.Fatal(err)
 	}
 }
@@ -94,53 +106,39 @@ func spoofHome() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	homeFile := filepath.Join(cwd, "home")
-	err = os.MkdirAll(homeFile, 0700)
+	homeDir := filepath.Join(cwd, "home")
+	err = os.MkdirAll(homeDir, 0700)
 	if err != nil {
 		return "", err
 	}
-	err = os.Setenv("HOME", homeFile)
-	return homeFile, err
+	err = os.Setenv("HOME", homeDir)
+	return homeDir, err
 }
 
-func TestLoadConfigNonExistent(t *testing.T) {
-	homeFile, err := spoofHome()
+func TestLoadconfigNonExistent(t *testing.T) {
+	a, homeDir, err := apodForTest(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDir(); err != nil {
-		t.Fatal(err)
+	defer os.RemoveAll(homeDir)
+
+	err = a.Loadconfig()
+	if err.Error() != configNotFound {
+		t.Fatalf("Expected: %v got: %v", configNotFound, err)
 	}
-	cfg, err := LoadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(cfg)
 }
 
-func TestLoadConfigExistent(t *testing.T) {
-	homeFile, err := spoofHome()
+func TestLoadconfigExistent(t *testing.T) {
+	a, homeDir, err := apodForTestConfigured(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDir(); err != nil {
-		t.Fatal(err)
-	}
-	cfgFile := filepath.Join(configDir(), configFileBasename)
-	f, err := os.Create(cfgFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.Write([]byte(`{"WallpaperDir":"bar"}`))
-	f.Close()
+	defer os.RemoveAll(homeDir)
 
-	cfg, err := LoadConfig()
+	err = a.Loadconfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(cfg)
 }
 
 func TestToday(t *testing.T) {
@@ -163,30 +161,16 @@ func TestUrlForDate(t *testing.T) {
 }
 
 func TestState(t *testing.T) {
-	homeFile, err := spoofHome()
+	a, homeDir, err := apodForTestConfigured(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDir(); err != nil {
+	defer os.RemoveAll(homeDir)
+	err = ioutil.WriteFile(stateFile(), []byte(`{"DateCode":"140121","Options":"fit"}`), 0644)
+	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := os.Create(stateFile())
-	if err != nil {
-		t.Fatal("could not create file foo")
-	}
-	_, err = f.WriteString(`{"DateCode":"140121","Options":"fit"}`)
-	if err != nil {
-		t.Fatal("could write to stateFile")
-	}
-	err = f.Close()
-	if err != nil {
-		t.Fatal("could close StateFile")
-	}
-
-	apod := APOD{}
-
-	rv, err := apod.State()
+	rv, err := a.State()
 	if err != nil {
 		t.Fatalf("Error during call to State: %v\n", err)
 	}
@@ -241,25 +225,16 @@ func TestContainsImage(t *testing.T) {
 }
 
 func TestDownload(t *testing.T) {
-	homeFile, err := spoofHome()
+	a, homeDir, err := apodForTestConfigured(imageRoundTrip{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(homeFile)
-	if err := MakeConfigDir(); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := LoadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	apod := APOD{Config: cfg, Client: &http.Client{Transport: imageRoundTrip{}}}
-	_, err = apod.download("http://apod.nasa.gov/apod/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
+	defer os.RemoveAll(homeDir)
+	_, err = a.download("http://a.nasa.gov/a/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
 	if err != nil {
 		t.Fatalf("could not load page: %v", err)
 	}
-	defer os.Remove(apod.fileName(testDateString))
-	image := apod.fileName(testDateString)
+	image := a.fileName(testDateString)
 	i, err := os.Open(image)
 	if err != nil {
 		t.Fatal(err)
@@ -305,7 +280,7 @@ func TestDownloadedWallpapers(t *testing.T) {
 		os.RemoveAll("foo")
 	}()
 	prepareTest(t)
-	cfg := Config{WallpaperDir: "foo"}
+	cfg := &config{WallpaperDir: "foo"}
 	apod := APOD{Config: cfg}
 
 	files, err := apod.DownloadedWallpapers()
@@ -321,7 +296,7 @@ func TestIndexOf(t *testing.T) {
 	defer func() {
 		os.RemoveAll("foo")
 	}()
-	apod := APOD{Config: Config{WallpaperDir: "foo"}}
+	apod := APOD{Config: &config{WallpaperDir: "foo"}}
 	prepareTest(t)
 	i, err := apod.IndexOf("010401")
 	if err != nil {
@@ -333,7 +308,7 @@ func TestIndexOf(t *testing.T) {
 }
 
 func TestFileName(t *testing.T) {
-	apod := APOD{Config: Config{WallpaperDir: "foo"}}
+	apod := APOD{Config: &config{WallpaperDir: "foo"}}
 	expected := filepath.Join("foo", "apod-img-140121")
 	got := apod.fileName(testDateString)
 	if expected != got {

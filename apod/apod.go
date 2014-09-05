@@ -31,6 +31,10 @@ func configDir() string {
 	return os.ExpandEnv("${HOME}/.config/apod-bg")
 }
 
+func configFile() string {
+	return filepath.Join(configDir(), configFileBasename)
+}
+
 func stateFile() string {
 	return filepath.Join(configDir(), stateFileBasename)
 }
@@ -39,14 +43,14 @@ func wallpaperSetScript() string {
 	return filepath.Join(configDir(), "set-wallpaper.sh")
 }
 
-const SetScriptBareWM = `#!/bin/bash
+const setScriptBareWM = `#!/bin/bash
 if test $WALLPAPER_OPTIONS = zoom; then
 	feh --bg-fill $WALLPAPER
 else
 	feh --bg-max $WALLPAPER
 fi
 `
-const SetScriptLXDE = `#!/bin/bash
+const setScriptLXDE = `#!/bin/bash
 if test $WALLPAPER_OPTIONS = zoom; then
 	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=stretch
 else
@@ -54,7 +58,7 @@ else
 fi
 `
 
-const SetScriptGNOME = `#!/bin/bash
+const setScriptGNOME = `#!/bin/bash
 gsettings set org.gnome.desktop.background picture-uri file://$WALLPAPER
 if test $WALLPAPER_OPTIONS = zoom; then
 	gsettings set  org.gnome.desktop.background picture-options zoom
@@ -64,19 +68,28 @@ fi
 gsettings set  org.gnome.desktop.background primary-color "000000"
 gsettings set  org.gnome.desktop.background secondary-color "000000"
 `
+const configNotFound = "configuration file was not found. Please run apod-bg -config=<barewm|gnome|lxde> first, see man page for more information."
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
-// Config sets where to find the wallpaper directory.
-type Config struct {
+// config sets where to find the wallpaper directory.
+type config struct {
 	WallpaperDir string
 }
 
-func (c *Config) MakeWallpaperDir() error {
+func (c *config) writeOut() error {
+	bs, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(configFile(), bs, 0644)
+}
+
+func (c *config) makeWallpaperDir() error {
 	return os.MkdirAll(c.WallpaperDir, 0700)
 }
 
-func MakeConfigDir() error {
+func makeConfigDir() error {
 	err := os.MkdirAll(configDir(), 0700)
 	if err != nil {
 		return fmt.Errorf("Could not create configuration directory %q, because: %v\n", configDir(), err)
@@ -84,93 +97,84 @@ func MakeConfigDir() error {
 	return nil
 }
 
-// LoadConfig loads a Config from disk or, failing that, returns an error.
-func LoadConfig() (Config, error) {
-	c := Config{}
-	configDir := configDir()
-
-	configFile := filepath.Join(configDir, configFileBasename)
-	cfgExists, err := exists(configFile)
-	if err != nil {
-		return c, err
-	}
-	if cfgExists {
-		f, err := os.Open(configFile)
-		if err != nil {
-			return c, err
-		}
-		defer f.Close()
-		dec := json.NewDecoder(f)
-		err = dec.Decode(&c)
-		if err != nil {
-			return c, err
-		}
-		err = c.MakeWallpaperDir()
-		return c, err
-	} else {
-		ok, err := exists(wallpaperSetScript())
-		if err != nil {
-			return c, err
-		}
-		if !ok {
-			err = WriteWallpaperScript(SetScriptBareWM)
-			if err != nil {
-				return c, err
-			}
-		}
-		wallpaperDir := filepath.Join(configDir, "wallpapers")
-		c.WallpaperDir = wallpaperDir
-		err = c.MakeWallpaperDir()
-		if err != nil {
-			return c, err
-		}
-		f, err := os.Create(configFile)
-		if err != nil {
-			return c, err
-		}
-		enc := json.NewEncoder(f)
-		err = enc.Encode(c)
-		return c, err
-	}
-}
-
-func WriteWallpaperScript(script string) error {
+func writeWallpaperScript(script string) error {
 	file := wallpaperSetScript()
-	s, err := os.Create(file)
-	if err != nil {
-		return err
-	}
-	_, err = s.WriteString(script)
-	if err != nil {
-		return err
-	}
-	err = s.Close()
-	if err != nil {
-		return err
-	}
-	err = os.Chmod(file, 0755)
+	err := ioutil.WriteFile(file, []byte(script), 0755)
 	return err
 }
 
 // APOD encapsulates commuticating with apod.nasa.gov
 type APOD struct {
 	Clock  clock.Clock
-	Config Config
+	Config *config
 	Client *http.Client
 	Log    *log.Logger
 }
 
 // NewAPOD constructs a new APOD object
 func NewAPOD(logger *log.Logger) APOD {
-	cfg, err := LoadConfig()
-	if err != nil {
-		logger.Fatalf("Could not load the configuration, because: %v\n", err)
-	}
+	cfg := new(config)
 	a := APOD{Config: cfg,
 		Clock:  clock.New(),
 		Client: http.DefaultClient,
 		Log:    logger}
+	err := a.Loadconfig()
+	if err != nil {
+		logger.Fatalf("Could not load the configuration, because: %v\n", err)
+	}
 	return a
+}
+
+// configure initializes the configuration according the config argument.
+func (a *APOD) Configure(cfg string) error {
+	a.Config = new(config)
+	{
+		err := makeConfigDir()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
+	{
+		a.Config.WallpaperDir = filepath.Join(configDir(), "wallpapers")
+		err := a.Config.makeWallpaperDir()
+		if err != nil {
+			return err
+		}
+		err = a.Config.writeOut()
+		if err != nil {
+			return err
+		}
+	}
+	script := ""
+	switch cfg {
+	case "barewm":
+		script = setScriptBareWM
+	case "lxde":
+		script = setScriptLXDE
+	case "gnome":
+		script = setScriptGNOME
+	default:
+		return fmt.Errorf("Unknown cfguration type: %s\n", cfg)
+	}
+	return writeWallpaperScript(script)
+}
+
+// Loadconfig loads a config from disk or, failing that, returns an error.
+func (a *APOD) Loadconfig() error {
+	cfgFile := configFile()
+	cfgExists, err := exists(cfgFile)
+	if err != nil {
+		return err
+	}
+	if !cfgExists {
+		return fmt.Errorf(configNotFound)
+	}
+	bs, err := ioutil.ReadFile(cfgFile)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(bs, a.Config)
+	return err
 }
 
 // Today returns the date of today in a formatted string.
