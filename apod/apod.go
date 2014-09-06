@@ -89,7 +89,7 @@ func (c *config) makeWallpaperDir() error {
 	return os.MkdirAll(c.WallpaperDir, 0700)
 }
 
-func makeConfigDir() error {
+func MakeConfigDir() error {
 	err := os.MkdirAll(configDir(), 0700)
 	if err != nil {
 		return fmt.Errorf("Could not create configuration directory %q, because: %v\n", configDir(), err)
@@ -118,10 +118,6 @@ func NewAPOD(logger *log.Logger) APOD {
 		Clock:  clock.New(),
 		Client: http.DefaultClient,
 		Log:    logger}
-	err := a.Loadconfig()
-	if err != nil {
-		logger.Fatalf("Could not load the configuration, because: %v\n", err)
-	}
 	return a
 }
 
@@ -129,7 +125,7 @@ func NewAPOD(logger *log.Logger) APOD {
 func (a *APOD) Configure(cfg string) error {
 	a.Config = new(config)
 	{
-		err := makeConfigDir()
+		err := MakeConfigDir()
 		if err != nil {
 			fmt.Println(err.Error())
 		}
@@ -209,15 +205,21 @@ type State struct {
 	Options  string
 }
 
-// State returns the current State-struct
+// State returns the current State-struct read from disk, or today if there is no statefile
 func (a *APOD) State() (State, error) {
-	sf, err := os.Open(stateFile())
+	present, err := exists(stateFile())
 	if err != nil {
 		return State{}, err
 	}
-	d := json.NewDecoder(sf)
+	if !present {
+		return State{DateCode: a.Today(), Options: fit}, nil
+	}
+	sfb, err := ioutil.ReadFile(stateFile())
+	if err != nil {
+		return State{}, err
+	}
 	var s State
-	err = d.Decode(&s)
+	err = json.Unmarshal(sfb, &s)
 	return s, err
 }
 

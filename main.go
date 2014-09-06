@@ -21,6 +21,13 @@ var (
 )
 
 func main() {
+	{
+		err := apod.MakeConfigDir()
+		if err != nil {
+			fmt.Printf("Could not create config dir")
+			return
+		}
+	}
 	flag.Parse()
 	var a apod.APOD
 	var logger *log.Logger
@@ -46,6 +53,11 @@ func main() {
 			os.Exit(2)
 		}
 		logf("apod-bg was successfully configured\n")
+		return
+	}
+	err := a.Loadconfig()
+	if err != nil {
+		logger.Fatalf("Could not load the configuration, because: %v\n", err)
 	}
 
 	if *apodFlag {
