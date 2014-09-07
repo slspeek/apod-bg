@@ -11,6 +11,7 @@ makedepends=('git' 'go')
 optdepends=(
 'feh: bare window-manager support'
 'pcmanfm: lxde support'
+'dunst: for receiving notifications'
 )
 
 options=('!strip' '!emptydirs')

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -28,29 +29,25 @@ func main() {
 		err := apod.MakeConfigDir()
 		if err != nil {
 			fmt.Printf("Could not create config dir")
-			return
+			os.Exit(1)
 		}
 		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
 		if err != nil {
 			fmt.Printf("Could not open logfile %q, because: %v\n", *logfile, err)
-			return
+			os.Exit(2)
 		}
 		defer f.Close()
-		logger = log.New(f, "", log.LstdFlags|log.Lshortfile)
+		mw := io.MultiWriter(os.Stdout, f)
+
+		logger = log.New(mw, "", log.LstdFlags)
 		a = apod.NewAPOD(logger)
 	}
-	var logf = func(format string, args ...interface{}) {
-		fmt.Printf(format, args...)
-		logger.Printf(format, args...)
-	}
-
 	if *config != "" {
 		err := a.Configure(*config)
 		if err != nil {
-			logf("Could not write the configuration, because: %v\n", err)
-			os.Exit(2)
+			logger.Fatalf("Could not write the configuration, because: %v\n", err)
 		}
-		logf("apod-bg was successfully configured\n")
+		logger.Printf("apod-bg was successfully configured\n")
 		return
 	}
 	err := a.Loadconfig()
@@ -61,10 +58,11 @@ func main() {
 	if *apodFlag {
 		err := a.OpenAPODToday()
 		if err != nil {
-			logf("Could not open the APOD page, because: %v\n", err)
-			os.Exit(3)
+			logger.Fatalf("Could not open the APOD page, because: %v\n", err)
 		} else {
-			logf("Opened the default browser on APOD\n")
+			mesg := "Opened the default browser on APOD\n"
+			apod.Notify(mesg)
+			logger.Printf(mesg)
 		}
 		return
 	}
@@ -72,10 +70,10 @@ func main() {
 	if *info {
 		err := a.OpenAPODOnBackground()
 		if err != nil {
-			logf("Could not open the APOD page on background now showing, because: %v\n", err)
-			os.Exit(3)
+			logger.Fatalf("Could not open the APOD page on background now showing, because: %v\n", err)
 		}
-		logf("Opened the default browser on the APOD-page related to the current background image\n")
+		logger.Printf("Opened the default browser on the APOD-page related to the current background image\n")
+		apod.Notify("Browser opened on NASA apod-page belonging to this background")
 		return
 	}
 
@@ -83,40 +81,39 @@ func main() {
 		today := a.Today()
 		if downloaded, err := a.IsDownloaded(today); downloaded || err != nil {
 			if err != nil {
-				logf("Could not check whether today was downloaded, because: %v\n", err)
-				os.Exit(4)
+				logger.Fatalf("Could not check whether today was downloaded, because: %v\n", err)
 			}
 			err := a.DisplayCurrent()
 			if err != nil {
-				logf("Today was already downloaded, but could not display the current wallpaper, because: %v\n", err)
-				os.Exit(5)
+				logger.Fatalf("Today was already downloaded, but could not display the current wallpaper, because: %v\n", err)
 			} else {
-				logf("Displayed the current wallpaper, as today was already downloaded\n")
+				logger.Printf("Displayed the current wallpaper, as today was already downloaded\n")
 			}
 			return
 		}
 		ok, err := a.Download(today)
 		if err != nil {
 			logger.Printf("An error occurred during todays (%s) image downloading: %v\n", today, err)
-			os.Exit(6)
 		}
 		if !ok {
-			logf("No new image today (%s) on APOD\n", today)
+			logger.Printf("No new image today (%s) on APOD\n", today)
+
+			apod.Notify(fmt.Sprintf("No new image today :-("))
 			err := a.DisplayCurrent()
 			if err != nil {
-				logf("Could not display the current wallpaper, because: %v\n", err)
-				os.Exit(7)
+				logger.Fatalf("Could not display the current wallpaper, because: %v\n", err)
 			} else {
-				logf("Displayed the current wallpaper, as today had no new image\n")
+				logger.Printf("Displayed the current wallpaper, as today had no new image\n")
 			}
 			return
 		}
 		err = a.SetWallpaper(apod.State{DateCode: today, Options: "fit"})
 		if err != nil {
-			logf("Could not set the wallpaper to %s, because: %v\n", today, err)
-			os.Exit(8)
+			logger.Fatalf("Could not set the wallpaper to %s, because: %v\n", today, err)
 		} else {
-			logf("Wallpaper set to %s\n", today)
+			mesg := fmt.Sprintf("Wallpaper set to %s\n", today)
+			apod.Notify(mesg)
+			logger.Printf(mesg)
 		}
 		return
 	}
@@ -128,21 +125,19 @@ func main() {
 	if *jump != 0 {
 		err := a.Jump(*jump)
 		if err != nil {
-			logf("Could not jump(%d): %v\n", *jump, err)
-			os.Exit(9)
-			return
+			apod.Notify(err.Error())
+			logger.Fatalf("Could not jump(%d): %v\n", *jump, err)
 		}
-		logf("Jump was successfull\n")
+		logger.Printf("Jump was successfull\n")
 		return
 	}
 
 	if *mode {
 		m, err := a.ToggleViewMode()
 		if err != nil {
-			logf("Could not mode viewing options: %v\n", err)
-			os.Exit(10)
+			logger.Fatalf("Could not mode viewing options: %v\n", err)
 		} else {
-			logf("Inversed the viewing option to: %s\n", m)
+			logger.Printf("Inversed the viewing option to: %s\n", m)
 		}
 		return
 	}

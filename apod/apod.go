@@ -14,6 +14,7 @@ import (
 	"sort"
 
 	"github.com/101loops/clock"
+	"github.com/haklop/gnotifier"
 	"github.com/skratchdot/open-golang/open"
 )
 
@@ -71,6 +72,13 @@ gsettings set  org.gnome.desktop.background secondary-color "000000"
 const configNotFound = "configuration file was not found. Please run apod-bg -config=<barewm|gnome|lxde> first, see man page for more information."
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
+
+func Notify(mesg string) {
+	notification := gnotifier.Notification("apod-bg", mesg)
+	notification.GetConfig().Expiration = 3000
+	notification.GetConfig().ApplicationName = "apod-bg"
+	notification.Push()
+}
 
 // config sets where to find the wallpaper directory.
 type config struct {
@@ -295,6 +303,7 @@ func (a *APOD) Download(isodate string) (bool, error) {
 	if !success {
 		return false, nil
 	}
+	Notify(fmt.Sprintf("Downloading todays APOD-image"))
 	file, err := a.download(imgURL, isodate)
 	if err != nil {
 		return true, err
@@ -354,8 +363,11 @@ func (a *APOD) Jump(n int) error {
 		return err
 	}
 	toGo := idx + n
-	if toGo >= len(all) || toGo < 0 {
-		return fmt.Errorf("Out of bounds: %d [0 ..(%d) .. %d] ", toGo, idx, len(all)-1)
+	if toGo >= len(all) {
+		return fmt.Errorf("End reached")
+	}
+	if toGo < 0 {
+		return fmt.Errorf("Begin reached")
 	}
 	code := all[toGo][len(imgprefix):]
 	st := State{DateCode: code, Options: fit}
