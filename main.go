@@ -21,17 +21,15 @@ var (
 )
 
 func main() {
+	flag.Parse()
+	var a apod.APOD
+	var logger *log.Logger
 	{
 		err := apod.MakeConfigDir()
 		if err != nil {
 			fmt.Printf("Could not create config dir")
 			return
 		}
-	}
-	flag.Parse()
-	var a apod.APOD
-	var logger *log.Logger
-	{
 		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
 		if err != nil {
 			fmt.Printf("Could not open logfile %q, because: %v\n", *logfile, err)

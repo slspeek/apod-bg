@@ -14,7 +14,7 @@ import (
 	"sort"
 
 	"github.com/101loops/clock"
-	"github.com/slspeek/open-golang/open"
+	"github.com/skratchdot/open-golang/open"
 )
 
 const (
