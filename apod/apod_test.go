@@ -24,28 +24,38 @@ const setScriptFailure = `#!/bin/bash
 exit 5
 `
 
-func apodForTest(t http.RoundTripper) (*APOD, string, error) {
+func setupTestHome(t *testing.T) string {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testHome := filepath.Join(wd, "test-home")
+	if err := os.MkdirAll(testHome, 0755); err != nil {
+		t.Fatal(err)
+	}
+	os.Setenv("HOME", testHome)
+	return testHome
+}
+
+func apodForTest(t *testing.T, tripper http.RoundTripper) (*APOD, string) {
 	recorder := gnotifier.NewTestRecorder()
 	// Global variable assignment
 	Notification = recorder.Notification
 
-	homeDir, err := spoofHome()
-	if err != nil {
-		return nil, "", err
-	}
+	testHome := setupTestHome(t)
 	a := new(APOD)
 	a.Log = log.New(os.Stdout, "", log.LstdFlags)
-	a.Client = &http.Client{Transport: t}
-	return a, homeDir, err
+	a.Client = &http.Client{Transport: tripper}
+	return a, testHome
 }
 
-func apodForTestConfigured(t http.RoundTripper) (*APOD, string, error) {
-	a, homeDir, err := apodForTest(t)
+func apodForTestConfigured(t *testing.T, tripper http.RoundTripper) (*APOD, string) {
+	a, testHome := apodForTest(t, tripper)
+	err := a.Configure("barewm")
 	if err != nil {
-		return nil, homeDir, err
+		t.Fatal(err)
 	}
-	err = a.Configure("barewm")
-	return a, homeDir, err
+	return a, testHome
 }
 
 func TestCollectTestData(t *testing.T) {
@@ -67,11 +77,8 @@ func TestCollectTestData(t *testing.T) {
 }
 
 func TestSetWallpaperSuccess(t *testing.T) {
-	a, homeDir, err := apodForTestConfigured(testRoundTrip{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(homeDir)
+	a, testHome := apodForTestConfigured(t, testRoundTrip{})
+	defer os.RemoveAll(testHome)
 	writeWallpaperScript(setScriptSuccess)
 	ok, err := a.Download(testDateString)
 	if err != nil {
@@ -87,11 +94,8 @@ func TestSetWallpaperSuccess(t *testing.T) {
 }
 
 func TestSetWallpaperFailure(t *testing.T) {
-	a, homeDir, err := apodForTestConfigured(testRoundTrip{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(homeDir)
+	a, testHome := apodForTestConfigured(t, testRoundTrip{})
+	defer os.RemoveAll(testHome)
 	writeWallpaperScript(setScriptFailure)
 	ok, err := a.Download(testDateString)
 	if err != nil {
@@ -106,41 +110,42 @@ func TestSetWallpaperFailure(t *testing.T) {
 	}
 }
 
-func spoofHome() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	homeDir := filepath.Join(cwd, "home")
-	err = os.MkdirAll(homeDir, 0700)
-	if err != nil {
-		return "", err
-	}
-	err = os.Setenv("HOME", homeDir)
-	return homeDir, err
-}
-
-func TestLoadconfigNonExistent(t *testing.T) {
-	a, homeDir, err := apodForTest(nil)
+func RunConfiguration(t *testing.T, cfg string, expected string) {
+	a, testHome := apodForTest(t, nil)
+	defer os.RemoveAll(testHome)
+	a.Configure(cfg)
+	script := wallpaperSetScript()
+	bs, err := ioutil.ReadFile(script)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(homeDir)
+	if string(bs) != expected {
+		t.Fatalf("Expected %s, got: %s", setScriptBareWM, string(bs))
+	}
+}
 
-	err = a.Loadconfig()
+func TestConfiguration(t *testing.T) {
+	for _, cfg := range [][]string{[]string{"barewm", setScriptBareWM},
+		[]string{"gnome", setScriptGNOME}, []string{"lxde", setScriptLXDE}} {
+		RunConfiguration(t, cfg[0], cfg[1])
+	}
+}
+
+func TestLoadconfigNonExistent(t *testing.T) {
+	a, testHome := apodForTest(t, nil)
+	defer os.RemoveAll(testHome)
+
+	err := a.Loadconfig()
 	if err.Error() != configNotFound {
 		t.Fatalf("Expected: %v got: %v", configNotFound, err)
 	}
 }
 
 func TestLoadconfigExistent(t *testing.T) {
-	a, homeDir, err := apodForTestConfigured(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(homeDir)
+	a, testHome := apodForTestConfigured(t, nil)
+	defer os.RemoveAll(testHome)
 
-	err = a.Loadconfig()
+	err := a.Loadconfig()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,12 +171,9 @@ func TestUrlForDate(t *testing.T) {
 }
 
 func TestState(t *testing.T) {
-	a, homeDir, err := apodForTestConfigured(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(homeDir)
-	err = ioutil.WriteFile(stateFile(), []byte(`{"DateCode":"140121","Options":"fit"}`), 0644)
+	a, testHome := apodForTestConfigured(t, nil)
+	defer os.RemoveAll(testHome)
+	err := ioutil.WriteFile(stateFile(), []byte(`{"DateCode":"140121","Options":"fit"}`), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,12 +232,9 @@ func TestContainsImage(t *testing.T) {
 }
 
 func TestDownload(t *testing.T) {
-	a, homeDir, err := apodForTestConfigured(imageRoundTrip{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(homeDir)
-	_, err = a.download("http://a.nasa.gov/a/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
+	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
+	defer os.RemoveAll(testHome)
+	_, err := a.download("http://a.nasa.gov/a/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
 	if err != nil {
 		t.Fatalf("could not load page: %v", err)
 	}

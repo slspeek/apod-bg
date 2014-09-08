@@ -25,6 +25,10 @@ var (
 
 func main() {
 	flag.Parse()
+	execute()
+}
+
+func execute() {
 	var a apod.APOD
 	var logger *log.Logger
 	{

@@ -25,4 +25,6 @@ bench:
 coverage:
 	mkdir -p report
 	gocov test github.com/slspeek/apod-bg/apod | gocov-html > report/coverage-apod.html
+	gocov test github.com/slspeek/apod-bg | gocov-html > report/coverage-main.html
+	
 

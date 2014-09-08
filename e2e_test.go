@@ -1,15 +1,14 @@
-package main_test
+package main
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestInitalConfiguration(t *testing.T) {
+func TestE2eInitalConfiguration(t *testing.T) {
 	c := exec.Command("go", "build", "-v")
 	out, err := c.CombinedOutput()
 	if err != nil {
@@ -17,20 +16,9 @@ func TestInitalConfiguration(t *testing.T) {
 	}
 	defer os.Remove("apod-bg")
 	ac := exec.Command("./apod-bg", "-nonotify", "-config", "barewm")
-	env := os.Environ()
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testHome := filepath.Join(wd, "home-e2e")
-	if err := os.MkdirAll(testHome, 0755); err != nil {
-		t.Fatal(err)
-	}
-
+	testHome := setupTestHome(t)
 	defer os.RemoveAll(testHome)
-	env = []string{fmt.Sprintf("HOME=%s", testHome)}
-	ac.Env = env
+	ac.Env = []string{fmt.Sprintf("HOME=%s", testHome)}
 
 	out, err = ac.CombinedOutput()
 	if err != nil {
