@@ -16,7 +16,7 @@ func TestInitalConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove("apod-bg")
-	ac := exec.Command("./apod-bg", "-config", "barewm")
+	ac := exec.Command("./apod-bg", "-nonotify", "-config", "barewm")
 	env := os.Environ()
 	wd, err := os.Getwd()
 	if err != nil {

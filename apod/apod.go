@@ -14,8 +14,8 @@ import (
 	"sort"
 
 	"github.com/101loops/clock"
-	"github.com/haklop/gnotifier"
 	"github.com/skratchdot/open-golang/open"
+	"github.com/slspeek/gnotifier"
 )
 
 const (
@@ -73,8 +73,10 @@ const configNotFound = "configuration file was not found. Please run apod-bg -co
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
 
+var Notification = gnotifier.Notification
+
 func Notify(mesg string) {
-	notification := gnotifier.Notification("apod-bg", mesg)
+	notification := Notification("apod-bg", mesg)
 	notification.GetConfig().Expiration = 3000
 	notification.GetConfig().ApplicationName = "apod-bg"
 	notification.Push()

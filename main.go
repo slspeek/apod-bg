@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/slspeek/apod-bg/apod"
+	"github.com/slspeek/gnotifier"
 )
 
 var (
@@ -19,6 +20,7 @@ var (
 	config   = flag.String("config", "", "initializes apod-bg for chosen window-manager")
 	apodFlag = flag.Bool("apod", false, "opens the default browser on the Astronomy Picture of The Day")
 	mode     = flag.Bool("mode", false, "mode background sizing options: fit or zoom")
+	nonotify = flag.Bool("nonotify", false, "do not send notifications to the desktop")
 )
 
 func main() {
@@ -41,6 +43,9 @@ func main() {
 
 		logger = log.New(mw, "", log.LstdFlags)
 		a = apod.NewAPOD(logger)
+	}
+	if *nonotify {
+		apod.Notification = gnotifier.NullNotification
 	}
 	if *config != "" {
 		err := a.Configure(*config)

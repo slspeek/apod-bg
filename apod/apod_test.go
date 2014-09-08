@@ -3,6 +3,7 @@ package apod
 import (
 	"bufio"
 	"github.com/101loops/clock"
+	"github.com/slspeek/gnotifier"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -24,6 +25,10 @@ exit 5
 `
 
 func apodForTest(t http.RoundTripper) (*APOD, string, error) {
+	recorder := gnotifier.NewTestRecorder()
+	// Global variable assignment
+	Notification = recorder.Notification
+
 	homeDir, err := spoofHome()
 	if err != nil {
 		return nil, "", err
