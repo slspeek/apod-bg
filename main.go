@@ -7,8 +7,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/haklop/gnotifier"
 	"github.com/slspeek/apod-bg/apod"
-	"github.com/slspeek/gnotifier"
 )
 
 var (

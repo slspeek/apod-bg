@@ -2,8 +2,6 @@ package apod
 
 import (
 	"bufio"
-	"github.com/101loops/clock"
-	"github.com/slspeek/gnotifier"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/101loops/clock"
+	"github.com/haklop/gnotifier"
 )
 
 const testDateString = "140121"
