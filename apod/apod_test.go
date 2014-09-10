@@ -45,6 +45,11 @@ func apodForTest(t *testing.T, tripper http.RoundTripper) (*APOD, string) {
 
 	testHome := setupTestHome(t)
 	a := new(APOD)
+	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
+	m := clock.NewMock()
+	m.Set(t0)
+
+	a.Clock = m
 	a.Log = log.New(os.Stdout, "", log.LstdFlags)
 	a.Client = &http.Client{Transport: tripper}
 	return a, testHome
@@ -253,19 +258,10 @@ func TestDownload(t *testing.T) {
 	}
 }
 
-func prepareTest(t *testing.T) {
-	err := os.MkdirAll("foo", 0700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = os.Chdir("foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	files := []string{"apod-img-000401", "apod-img-010401", "apod-img-020401"}
+func prepareTest(t *testing.T, a *APOD) {
+	files := []string{"140120", "140121", "140122"}
 	for _, file := range files {
-		f, err := os.Create(file)
+		f, err := os.Create(a.fileName(file))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -274,21 +270,14 @@ func prepareTest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	err = os.Chdir("..")
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestDownloadedWallpapers(t *testing.T) {
-	defer func() {
-		os.RemoveAll("foo")
-	}()
-	prepareTest(t)
-	cfg := &config{WallpaperDir: "foo"}
-	apod := APOD{Config: cfg}
+	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
+	defer os.RemoveAll(testHome)
+	prepareTest(t, a)
 
-	files, err := apod.DownloadedWallpapers()
+	files, err := a.DownloadedWallpapers()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,17 +287,26 @@ func TestDownloadedWallpapers(t *testing.T) {
 }
 
 func TestIndexOf(t *testing.T) {
-	defer func() {
-		os.RemoveAll("foo")
-	}()
-	apod := APOD{Config: &config{WallpaperDir: "foo"}}
-	prepareTest(t)
-	i, err := apod.IndexOf("010401")
+	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
+	defer os.RemoveAll(testHome)
+	prepareTest(t, a)
+	i, err := a.IndexOf("140121")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if i != 1 {
 		t.Fatalf("Expected 1, got %d", i)
+	}
+}
+
+func TestJumpWithoutState(t *testing.T) {
+	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
+	defer os.RemoveAll(testHome)
+	prepareTest(t, a)
+	writeWallpaperScript(setScriptSuccess)
+	err := a.Jump(-1)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

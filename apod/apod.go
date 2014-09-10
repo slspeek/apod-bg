@@ -113,7 +113,7 @@ func writeWallpaperScript(script string) error {
 	return err
 }
 
-// APOD encapsulates commuticating with apod.nasa.gov
+// APOD encapsulates communicating with apod.nasa.gov
 type APOD struct {
 	Clock  clock.Clock
 	Config *config
@@ -137,7 +137,7 @@ func (a *APOD) Configure(cfg string) error {
 	{
 		err := MakeConfigDir()
 		if err != nil {
-			fmt.Println(err.Error())
+			return err
 		}
 	}
 	{
@@ -160,7 +160,7 @@ func (a *APOD) Configure(cfg string) error {
 	case "gnome":
 		script = setScriptGNOME
 	default:
-		return fmt.Errorf("Unknown cfguration type: %s\n", cfg)
+		return fmt.Errorf("Unknown configuration type: %s\n", cfg)
 	}
 	return writeWallpaperScript(script)
 }
@@ -189,13 +189,13 @@ func (a *APOD) Today() string {
 	return t.Format(format)
 }
 
-// OpenAPOD opens the webpage at apod.nasa.gov for a given day in the default browser.
+// OpenAPOD opens the web page at apod.nasa.gov for a given day in the default browser.
 func (a *APOD) OpenAPOD(isodate string) error {
 	url := a.UrlForDate(isodate)
 	return open.Start(url)
 }
 
-// OpenAPODToday opens the today's page at apod.nasa.gov .
+// OpenAPODToday opens the today's page at apod.nasa.gov
 func (a *APOD) OpenAPODToday() error {
 	return a.OpenAPOD(a.Today())
 }
@@ -215,7 +215,7 @@ type State struct {
 	Options  string
 }
 
-// State returns the current State-struct read from disk, or today if there is no statefile
+// State returns the current State-struct read from disk, or today if there is no state file
 func (a *APOD) State() (State, error) {
 	present, err := exists(stateFile())
 	if err != nil {
@@ -233,14 +233,14 @@ func (a *APOD) State() (State, error) {
 	return s, err
 }
 
-// LoadRecentPast loads images from apod.nasa.gov to the wallpaper dir, for a set number of days back, or throws error.
+// LoadRecentPast loads images from apod.nasa.gov to the wallpaper directory, for a set number of days back
 func (a *APOD) LoadRecentPast(days int) {
 	for _, isodate := range a.recentPast(days) {
 		a.Download(isodate)
 	}
 }
 
-// ContainsImage parses an APOD page for a linked image, returns false/true, and image URL if successful.
+// ContainsImage parses an APOD page for a linked image, returns success, and image URL if successful or an error
 func (a *APOD) ContainsImage(url string) (bool, string, error) {
 	content, err := a.loadPage(url)
 	if err != nil {
@@ -326,12 +326,10 @@ func (a *APOD) IndexOf(isodate string) (int, error) {
 			return i, nil
 		}
 	}
-	return 0, fmt.Errorf("Not found")
+	return 0, fmt.Errorf("%s was not found", isodate)
 }
 
-func (a *APOD) SetViewingMode(fill bool) {}
-
-// UrlForDate returns the URL for the APOD page for the given isodate.
+// UrlForDate returns the URL for the APOD page for the given ISO date.
 func (a *APOD) UrlForDate(isodate string) string {
 	return fmt.Sprintf("http://apod.nasa.gov/apod/ap%s.html", isodate)
 }
@@ -358,7 +356,7 @@ func (a *APOD) Jump(n int) error {
 	var idx int
 	s, err := a.State()
 	if err != nil {
-		idx = 0
+		return err
 	}
 	idx, err = a.IndexOf(s.DateCode)
 	if err != nil {
