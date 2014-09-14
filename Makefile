@@ -1,5 +1,9 @@
 all: fmt test vet bench coverage doc
 
+clean:
+	go clean
+	rm -rf report
+
 prepare-dev:
 	go get github.com/axw/gocov/gocov	
 	go get gopkg.in/matm/v1/gocov-html
@@ -25,6 +29,6 @@ bench:
 coverage:
 	mkdir -p report
 	gocov test github.com/slspeek/apod-bg/apod | gocov-html > report/coverage-apod.html
-	gocov test github.com/slspeek/apod-bg | gocov-html > report/coverage-main.html
+	#gocov test github.com/slspeek/apod-bg | gocov-html > report/coverage-main.html
 	
 

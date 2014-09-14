@@ -3,17 +3,12 @@ package apod
 import (
 	"bufio"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/101loops/clock"
-	"github.com/haklop/gnotifier"
 )
 
 const testDateString = "140121"
@@ -38,32 +33,6 @@ func setupTestHome(t *testing.T) string {
 	return testHome
 }
 
-func apodForTest(t *testing.T, tripper http.RoundTripper) (*APOD, string) {
-	recorder := gnotifier.NewTestRecorder()
-	// Global variable assignment
-	Notification = recorder.Notification
-
-	testHome := setupTestHome(t)
-	a := new(APOD)
-	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
-	m := clock.NewMock()
-	m.Set(t0)
-
-	a.Clock = m
-	a.Log = log.New(os.Stdout, "", log.LstdFlags)
-	a.Client = &http.Client{Transport: tripper}
-	return a, testHome
-}
-
-func apodForTestConfigured(t *testing.T, tripper http.RoundTripper) (*APOD, string) {
-	a, testHome := apodForTest(t, tripper)
-	err := a.Configure("barewm")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return a, testHome
-}
-
 func TestCollectTestData(t *testing.T) {
 	t.Skip()
 	resp, err := http.Get("http://timbeauchamp.tripod.com/moon/moon15.gif")
@@ -82,113 +51,11 @@ func TestCollectTestData(t *testing.T) {
 	}
 }
 
-func TestSetWallpaperSuccess(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, testRoundTrip{})
-	defer os.RemoveAll(testHome)
-	writeWallpaperScript(setScriptSuccess)
-	ok, err := a.Download(testDateString)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("21 januari 2014 does contain an image on APOD")
-	}
-	err = a.SetWallpaper(State{DateCode: testDateString})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSetWallpaperFailure(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, testRoundTrip{})
-	defer os.RemoveAll(testHome)
-	writeWallpaperScript(setScriptFailure)
-	ok, err := a.Download(testDateString)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("21 januari 2014 does contain an image on APOD")
-	}
-	err = a.SetWallpaper(State{DateCode: testDateString})
-	if err.Error() != "exit status 5" {
-		t.Fatal(err)
-	}
-}
-
-func RunConfiguration(t *testing.T, cfg string, expected string) {
-	a, testHome := apodForTest(t, nil)
-	defer os.RemoveAll(testHome)
-	a.Configure(cfg)
-	script := wallpaperSetScript()
-	bs, err := ioutil.ReadFile(script)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(bs) != expected {
-		t.Fatalf("Expected %s, got: %s", setScriptBareWM, string(bs))
-	}
-}
-
-func TestConfiguration(t *testing.T) {
-	for _, cfg := range [][]string{[]string{"barewm", setScriptBareWM},
-		[]string{"gnome", setScriptGNOME}, []string{"lxde", setScriptLXDE}} {
-		RunConfiguration(t, cfg[0], cfg[1])
-	}
-}
-
-func TestLoadconfigNonExistent(t *testing.T) {
-	a, testHome := apodForTest(t, nil)
-	defer os.RemoveAll(testHome)
-
-	err := a.Loadconfig()
-	if err.Error() != configNotFound {
-		t.Fatalf("Expected: %v got: %v", configNotFound, err)
-	}
-}
-
-func TestLoadconfigExistent(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, nil)
-	defer os.RemoveAll(testHome)
-
-	err := a.Loadconfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestToday(t *testing.T) {
-	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
-	m := clock.NewMock()
-	m.Set(t0)
-
-	apod := APOD{Clock: m}
-	if apod.Today() != testDateString {
-		t.Errorf("Expected %v, got %v", testDateString, apod.Today())
-	}
-}
-
 func TestUrlForDate(t *testing.T) {
 	apod := APOD{}
 	url := apod.UrlForDate(testDateString)
 	if url != "http://apod.nasa.gov/apod/ap140121.html" {
 		t.Errorf("Expected: http://apod.nasa.gov/apod/ap140121.html, got %s", url)
-	}
-}
-
-func TestState(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, nil)
-	defer os.RemoveAll(testHome)
-	err := ioutil.WriteFile(stateFile(), []byte(`{"DateCode":"140121","Options":"fit"}`), 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rv, err := a.State()
-	if err != nil {
-		t.Fatalf("Error during call to State: %v\n", err)
-	}
-	if rv.DateCode != testDateString {
-		t.Errorf("Expected 140121, got %v", rv)
 	}
 }
 
@@ -228,94 +95,12 @@ func (l apodRoundTrip) RoundTrip(*http.Request) (*http.Response, error) {
 
 func TestContainsImage(t *testing.T) {
 	apod := APOD{Client: &http.Client{Transport: apodRoundTrip{}}}
-	_, url, err := apod.ContainsImage("http://apod.nasa.gov/apod/astropix.html")
+	url, err := apod.ContainsImage("http://apod.nasa.gov/apod/astropix.html")
 	if err != nil {
 		t.Fatal("could not load page")
 	}
 	if url != "http://apod.nasa.gov/apod/image/1407/nycsunset_tyson_768.jpg" {
 		t.Fatalf("Expected http://apod.nasa.gov/apod/image/1407/nycsunset_tyson_768.jpg but got %v", url)
-	}
-}
-
-func TestDownload(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
-	defer os.RemoveAll(testHome)
-	_, err := a.download("http://a.nasa.gov/a/image/1401/microsupermoon_sciarpetti_459.jpg", testDateString)
-	if err != nil {
-		t.Fatalf("could not load page: %v", err)
-	}
-	image := a.fileName(testDateString)
-	i, err := os.Open(image)
-	if err != nil {
-		t.Fatal(err)
-	}
-	info, err := i.Stat()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Size() != 2185 {
-		t.Fatalf("Wrong size expected 2185, got: %d", info.Size())
-	}
-}
-
-func prepareTest(t *testing.T, a *APOD) {
-	files := []string{"140120", "140121", "140122"}
-	for _, file := range files {
-		f, err := os.Create(a.fileName(file))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = f.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func TestDownloadedWallpapers(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
-	defer os.RemoveAll(testHome)
-	prepareTest(t, a)
-
-	files, err := a.DownloadedWallpapers()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(files) != 3 {
-		t.Fatal("Expected 3 files")
-	}
-}
-
-func TestIndexOf(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
-	defer os.RemoveAll(testHome)
-	prepareTest(t, a)
-	i, err := a.IndexOf("140121")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if i != 1 {
-		t.Fatalf("Expected 1, got %d", i)
-	}
-}
-
-func TestJumpWithoutState(t *testing.T) {
-	a, testHome := apodForTestConfigured(t, imageRoundTrip{})
-	defer os.RemoveAll(testHome)
-	prepareTest(t, a)
-	writeWallpaperScript(setScriptSuccess)
-	err := a.Jump(-1)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestFileName(t *testing.T) {
-	apod := APOD{Config: &config{WallpaperDir: "foo"}}
-	expected := filepath.Join("foo", "apod-img-140121")
-	got := apod.fileName(testDateString)
-	if expected != got {
-		t.Fatalf("Expected: %v, got %v", expected, got)
 	}
 }
 
