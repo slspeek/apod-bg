@@ -140,7 +140,7 @@ type State struct {
 	Options  string
 }
 
-// State returns the current State-struct read from disk, or today if there is no state file
+// State returns the current State-struct read from disk, or a new State object set to today if there is no state file
 func (f *Frontend) State() (State, error) {
 	present, err := exists(stateFile())
 	if err != nil {
@@ -176,7 +176,7 @@ func (f *Frontend) Notify(mesg string) {
 	notification.Push()
 }
 
-// Today returns the date of today in a formatted string.
+// Now returns time.Now() and is fakable/
 func (f *Frontend) Now() time.Time {
 	return f.Clock.Now()
 }
@@ -263,7 +263,7 @@ func (f *Frontend) OpenAPODOnBackground() error {
 	return f.OpenAPOD(s.DateCode)
 }
 
-// Jump jumps to an image next or previous in the wallpaper directory.
+// Jump jumps to an image n places further or back if n is negative in the wallpaper directory.
 func (f *Frontend) Jump(n int) error {
 	all, err := f.storage.DownloadedWallpapers()
 	if err != nil {
@@ -305,7 +305,7 @@ func (f *Frontend) SetWallpaper(s State) error {
 	return f.store(s)
 }
 
-// ToggleViewMode toggles the view mode fill/full.
+// ToggleViewMode toggles the view mode fill/zoom. It returns the new state.
 func (f *Frontend) ToggleViewMode() (string, error) {
 	s, err := f.State()
 	if err != nil {
@@ -319,7 +319,7 @@ func (f *Frontend) ToggleViewMode() (string, error) {
 	return s.Options, f.SetWallpaper(s)
 }
 
-//DisplayCurrent reads the State file and sets the wallpaper accordingly.
+// DisplayCurrent reads the State file and sets the wallpaper accordingly.
 func (f *Frontend) DisplayCurrent() error {
 	isodate, err := f.State()
 	if err != nil {
