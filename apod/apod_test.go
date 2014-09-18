@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -19,19 +18,6 @@ exit 0
 const setScriptFailure = `#!/bin/bash
 exit 5
 `
-
-func setupTestHome(t *testing.T) string {
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	testHome := filepath.Join(wd, "test-home")
-	if err := os.MkdirAll(testHome, 0755); err != nil {
-		t.Fatal(err)
-	}
-	os.Setenv("HOME", testHome)
-	return testHome
-}
 
 func TestCollectTestData(t *testing.T) {
 	t.Skip()

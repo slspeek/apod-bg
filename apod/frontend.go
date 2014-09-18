@@ -19,7 +19,7 @@ import (
 
 var (
 	info       = flag.Bool("info", false, "open the APOD-page on the current background")
-	login      = flag.Bool("login", false, "do the procedure for a graphical login: download todays image and display it")
+	login      = flag.Bool("login", false, "do the procedure for APOD graphical login: download todays image and display it")
 	logfile    = flag.String("log", os.ExpandEnv("${HOME}/.config/apod-bg/apod-bg.log"), "logfile specification")
 	days       = flag.Int("fetch", 0, "days to go back downloading")
 	jump       = flag.Int("jump", 0, "jump N backgrounds further, use negative numbers to jump backward")
@@ -78,7 +78,19 @@ fi
 gsettings set  org.gnome.desktop.background primary-color "000000"
 gsettings set  org.gnome.desktop.background secondary-color "000000"
 `
-const configNotFound = "configuration file was not found. Please run apod-bg -config=<barewm|gnome|lxde> first, see man page for more information."
+const configNotFound = "configuration file was not found. Please run apod-bg -config=barewm|gnome|lxde> first, see man page for more information."
+
+type logger interface {
+	Printf(f string, i ...interface{})
+}
+
+//type fileLogger struct {
+//Log *log.Logger
+//}
+
+//func (f *fileLogger) Printf(format string, i ...interface{}) {
+//f.Printf(format, i...)
+//}
 
 // config sets where to find the wallpaper directory.
 type config struct {
@@ -111,24 +123,36 @@ func writeWallpaperScript(script string) error {
 	return err
 }
 
-type Frontend struct {
-	Clock    clock.Clock
-	Log      *log.Logger
-	Config   *config
-	Notifier gnotifier.Builder
-	a        *APOD
-	loader   *Loader
-	storage  *Storage
+type Notifier struct {
+	Notification gnotifier.Builder
 }
 
-func NewFrontend(logger *log.Logger) *Frontend {
-	a := NewAPOD()
+func (n *Notifier) Notify(mesg string) {
+	notification := n.Notification("apod-bg", mesg)
+	notification.GetConfig().Expiration = 3000
+	notification.GetConfig().ApplicationName = "apod-bg"
+	notification.Push()
+}
+
+type Frontend struct {
+	Clock  clock.Clock
+	Log    logger
+	Config *config
+	Notifier
+	APOD    *APOD
+	loader  *Loader
+	storage *Storage
+}
+
+func NewFrontend(logger logger, notifier Notifier) *Frontend {
+	APOD := NewAPOD()
 	s := &Storage{}
-	l := &Loader{a: a, storage: s}
+	l := &Loader{APOD: APOD, storage: s, logger: logger, Notifier: notifier}
 	return &Frontend{Clock: clock.New(),
 		Log:      logger,
-		Notifier: gnotifier.Notification,
-		a:        a,
+		Notifier: notifier,
+		APOD:     APOD,
+		Config:   new(config),
 		loader:   l,
 		storage:  s}
 
@@ -140,7 +164,7 @@ type State struct {
 	Options  string
 }
 
-// State returns the current State-struct read from disk, or a new State object set to today if there is no state file
+// State returns the current State-struct read from disk, or APOD new State object set to today if there is no state file
 func (f *Frontend) State() (State, error) {
 	present, err := exists(stateFile())
 	if err != nil {
@@ -169,19 +193,12 @@ func (f *Frontend) store(s State) error {
 	return err
 }
 
-func (f *Frontend) Notify(mesg string) {
-	notification := f.Notifier("apod-bg", mesg)
-	notification.GetConfig().Expiration = 3000
-	notification.GetConfig().ApplicationName = "apod-bg"
-	notification.Push()
-}
-
 // Now returns time.Now() and is fakable/
 func (f *Frontend) Now() time.Time {
 	return f.Clock.Now()
 }
 
-// Today returns the date of today in a formatted string.
+// Today returns the date of today in APOD formatted string.
 func (f *Frontend) Today() string {
 	t := f.Now()
 	return t.Format(format)
@@ -221,7 +238,7 @@ func (f *Frontend) Configure(cfg string) error {
 	return writeWallpaperScript(script)
 }
 
-// Loadconfig loads a config from disk or, failing that, returns an error.
+// Loadconfig loads APOD config from disk or, failing that, returns an error.
 func (f *Frontend) Loadconfig() error {
 	cfgFile := configFile()
 	cfgExists, err := exists(cfgFile)
@@ -243,9 +260,9 @@ func (f *Frontend) Loadconfig() error {
 	return err
 }
 
-// OpenAPOD opens the web page at apod.nasa.gov for a given day in the default browser.
+// OpenAPOD opens the web page at apod.nasa.gov for APOD given day in the default browser.
 func (f *Frontend) OpenAPOD(isodate string) error {
-	url := f.a.UrlForDate(isodate)
+	url := f.APOD.UrlForDate(isodate)
 	return open.Start(url)
 }
 
@@ -329,78 +346,97 @@ func (f *Frontend) DisplayCurrent() error {
 	return err
 }
 
-// Execute is the entry point for the apod-bg command
-func Execute() {
-	var front *Frontend
+func initLogging() (*log.Logger, *os.File, error) {
 	var logger *log.Logger
-	{
-		err := MakeConfigDir()
-		if err != nil {
-			fmt.Printf("Could not create config dir")
-			os.Exit(1)
-		}
-		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
-		if err != nil {
-			fmt.Printf("Could not open logfile %q, because: %v\n", *logfile, err)
-			os.Exit(2)
-		}
-		defer f.Close()
-		mw := io.MultiWriter(os.Stdout, f)
-
-		logger = log.New(mw, "", log.LstdFlags)
-		front = NewFrontend(logger)
+	err := MakeConfigDir()
+	if err != nil {
+		return nil, nil, fmt.Errorf("Could not create config dir")
 	}
+	f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+	if err != nil {
+		return nil, f, fmt.Errorf("Could not open logfile %q, because: %v\n", *logfile, err)
+	}
+	mw := io.MultiWriter(os.Stdout, f)
+
+	logger = log.New(mw, "", log.LstdFlags)
+	return logger, f, nil
+}
+
+// Execute is the entry point for the apod-bg command
+func Execute() error {
+	logger, f, err := initLogging()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	defer f.Close()
+	var front *Frontend
+	logger.Printf("APOD starts")
 	if *nonotify {
-		front.Notifier = gnotifier.NullNotification
+		front = NewFrontend(logger, Notifier{gnotifier.NullNotification})
+	} else {
+		front = NewFrontend(logger, Notifier{gnotifier.Notification})
 	}
 	if *configFlag != "" {
 		err := front.Configure(*configFlag)
 		if err != nil {
-			logger.Fatalf("Could not write the configuration, because: %v\n", err)
+			err = fmt.Errorf("Could not write the configuration, because: %v\n", err)
+			logger.Printf("%v\n", err)
+			return err
 		}
 		logger.Printf("apod-bg was successfully configured\n")
-		return
+		return nil
 	}
-	err := front.Loadconfig()
+	err = front.Loadconfig()
 	if err != nil {
-		logger.Fatalf("Could not load the configuration, because: %v\n", err)
+		err = fmt.Errorf("Could not load the configuration, because: %v\n", err)
+		logger.Printf("%v\n", err)
+		return err
 	}
 
 	if *apodFlag {
 		err := front.OpenAPODToday()
 		if err != nil {
-			logger.Fatalf("Could not open the APOD page, because: %v\n", err)
+			err = fmt.Errorf("Could not open the APOD page, because: %v\n", err)
+			logger.Printf("%v\n", err)
+			return err
 		} else {
 			mesg := "Opened the default browser on APOD\n"
 			front.Notify(mesg)
 			logger.Printf(mesg)
 		}
-		return
+		return nil
 	}
 
 	if *info {
 		err := front.OpenAPODOnBackground()
 		if err != nil {
-			logger.Fatalf("Could not open the APOD page on background now showing, because: %v\n", err)
+			err = fmt.Errorf("Could not open the APOD page on background now showing, because: %v\n", err)
+			logger.Printf("%v\n", err)
+			return err
 		}
 		logger.Printf("Opened the default browser on the APOD-page related to the current background image\n")
 		front.Notify("Browser opened on NASA apod-page belonging to this background")
-		return
+		return nil
 	}
 
 	if *login {
 		today := front.Today()
 		if downloaded, err := front.storage.IsDownloaded(today); downloaded || err != nil {
 			if err != nil {
-				logger.Fatalf("Could not check whether today was downloaded, because: %v\n", err)
+				err = fmt.Errorf("Could not check whether today was downloaded, because: %v\n", err)
+				logger.Printf("%v\n", err)
+				return err
 			}
 			err := front.DisplayCurrent()
 			if err != nil {
-				logger.Fatalf("Today was already downloaded, but could not display the current wallpaper, because: %v\n", err)
+				err = fmt.Errorf("Today was already downloaded, but could not display the current wallpaper, because: %v\n", err)
+				logger.Printf("%v\n", err)
+				return err
 			} else {
 				logger.Printf("Displayed the current wallpaper, as today was already downloaded\n")
 			}
-			return
+			return nil
 		}
 		ok, err := front.loader.Download(today)
 		if err != nil {
@@ -412,21 +448,25 @@ func Execute() {
 			front.Notify(fmt.Sprintf("No new image today :-("))
 			err := front.DisplayCurrent()
 			if err != nil {
-				logger.Fatalf("Could not display the current wallpaper, because: %v\n", err)
+				err = fmt.Errorf("Could not display the current wallpaper, because: %v\n", err)
+				logger.Printf("%v\n", err)
+				return err
 			} else {
 				logger.Printf("Displayed the current wallpaper, as today had no new image\n")
 			}
-			return
+			return nil
 		}
 		err = front.SetWallpaper(State{DateCode: today, Options: "fit"})
 		if err != nil {
-			logger.Fatalf("Could not set the wallpaper to %s, because: %v\n", today, err)
+			err = fmt.Errorf("Could not set the wallpaper to %s, because: %v\n", today, err)
+			logger.Printf("%v\n", err)
+			return err
 		} else {
 			mesg := fmt.Sprintf("Wallpaper set to %s\n", today)
 			front.Notify(mesg)
 			logger.Printf(mesg)
 		}
-		return
+		return nil
 	}
 
 	if *days > 0 {
@@ -437,19 +477,25 @@ func Execute() {
 		err := front.Jump(*jump)
 		if err != nil {
 			front.Notify(err.Error())
-			logger.Fatalf("Could not jump(%d): %v\n", *jump, err)
+			err = fmt.Errorf("Could not jump(%d): %v\n", *jump, err)
+			logger.Printf("%v\n", err)
+			return err
 		}
 		logger.Printf("Jump was successfull\n")
-		return
+		return nil
 	}
 
 	if *mode {
 		m, err := front.ToggleViewMode()
 		if err != nil {
-			logger.Fatalf("Could not mode viewing options: %v\n", err)
+			err = fmt.Errorf("Could not mode viewing options: %v\n", err)
+			logger.Printf("%v\n", err)
+			return err
+
 		} else {
 			logger.Printf("Inversed the viewing option to: %s\n", m)
 		}
-		return
+		return nil
 	}
+	return nil
 }

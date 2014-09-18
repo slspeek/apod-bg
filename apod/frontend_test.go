@@ -4,33 +4,47 @@ import (
 	"github.com/101loops/clock"
 	"github.com/haklop/gnotifier"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
 
+type nullLogger struct{}
+
+func (n nullLogger) Printf(f string, i ...interface{}) {
+}
+
+func setupTestHome(t testing.TB) string {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testHome := filepath.Join(wd, "test-home")
+	if err := os.MkdirAll(testHome, 0755); err != nil {
+		t.Fatal(err)
+	}
+	os.Setenv("HOME", testHome)
+	return testHome
+}
+
+func makeStateFile(t testing.TB) {
+	err := ioutil.WriteFile(stateFile(), []byte(`{"DateCode":"140121","Options":"fit"}`), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func frontendForTest(t *testing.T, tripper http.RoundTripper) (*Frontend, string) {
 	recorder := gnotifier.NewTestRecorder()
-	f := new(Frontend)
-	f.Notifier = recorder.Notification
+	f := NewFrontend(nullLogger{}, Notifier{recorder.Notification})
 
 	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
 	m := clock.NewMock()
 	m.Set(t0)
 	f.Clock = m
-
-	f.Log = log.New(os.Stdout, "", log.LstdFlags)
-
-	a := new(APOD)
-	a.Client = &http.Client{Transport: tripper}
-	f.a = a
-
-	s := new(Storage)
-	l := &Loader{a: a, storage: s}
-	f.loader = l
-	f.storage = s
+	f.APOD.Client = &http.Client{Transport: tripper}
 
 	return f, setupTestHome(t)
 }
@@ -48,10 +62,10 @@ func frontendForTestConfigured(t *testing.T, tripper http.RoundTripper) (*Fronte
 	return f, testHome
 }
 
-func TestJumpWithoutState(t *testing.T) {
+func TestJump(t *testing.T) {
 	f, testHome := frontendForTestConfigured(t, imageRoundTrip{})
 	defer os.RemoveAll(testHome)
-	prepareTest(t, f.storage)
+	makeTestWallpapers(t, f.storage)
 	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(-1)
 	if err != nil {
@@ -60,13 +74,10 @@ func TestJumpWithoutState(t *testing.T) {
 }
 
 func TestState(t *testing.T) {
-	a, testHome := frontendForTestConfigured(t, nil)
+	APOD, testHome := frontendForTestConfigured(t, nil)
 	defer os.RemoveAll(testHome)
-	err := ioutil.WriteFile(stateFile(), []byte(`{"DateCode":"140121","Options":"fit"}`), 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rv, err := a.State()
+	makeStateFile(t)
+	rv, err := APOD.State()
 	if err != nil {
 		t.Fatalf("Error during call to State: %v\n", err)
 	}
@@ -107,10 +118,10 @@ func TestLoadconfigNonExistent(t *testing.T) {
 }
 
 func TestLoadconfigExistent(t *testing.T) {
-	a, testHome := frontendForTestConfigured(t, nil)
+	APOD, testHome := frontendForTestConfigured(t, nil)
 	defer os.RemoveAll(testHome)
 
-	err := a.Loadconfig()
+	err := APOD.Loadconfig()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,30 +138,49 @@ func TestToday(t *testing.T) {
 	}
 }
 
-func TestConfigurationE2e(t *testing.T) {
-	testHome := setupTestHome(t)
-	defer os.RemoveAll(testHome)
-	cfg := "barewm"
-	configFlag = &cfg
-	Execute()
-}
-
 func TestSetWallpaperSuccess(t *testing.T) {
-	a, testHome := frontendForTestConfigured(t, testRoundTrip{})
+	front, testHome := frontendForTestConfigured(t, testRoundTrip{})
 	defer os.RemoveAll(testHome)
 	writeWallpaperScript(setScriptSuccess)
-	err := a.SetWallpaper(State{DateCode: testDateString})
+	err := front.SetWallpaper(State{DateCode: testDateString})
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestSetWallpaperFailure(t *testing.T) {
-	a, testHome := frontendForTestConfigured(t, testRoundTrip{})
+	front, testHome := frontendForTestConfigured(t, testRoundTrip{})
 	defer os.RemoveAll(testHome)
 	writeWallpaperScript(setScriptFailure)
-	err := a.SetWallpaper(State{DateCode: testDateString})
+	err := front.SetWallpaper(State{DateCode: testDateString})
 	if err.Error() != "exit status 5" {
+		t.Fatal(err)
+	}
+}
+
+func TestConfigurationE2e(t *testing.T) {
+	testHome := setupTestHome(t)
+	defer os.RemoveAll(testHome)
+	cfg := "barewm"
+	configFlag = &cfg
+	if err := Execute(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJumpWithStateE2e(t *testing.T) {
+	f, testHome := frontendForTestConfigured(t, nil)
+	defer os.RemoveAll(testHome)
+	makeStateFile(t)
+	makeTestWallpapers(t, f.storage)
+	writeWallpaperScript(setScriptSuccess)
+
+	j := -1
+	jump = &j
+	nono := true
+	nonotify = &nono
+
+	if err := Execute(); err != nil {
 		t.Fatal(err)
 	}
 }

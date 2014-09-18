@@ -1,19 +1,16 @@
 package apod
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-func prepareTest(t *testing.T, s *Storage) {
+func makeTestWallpapers(t testing.TB, s *Storage) {
 	files := []string{"140120", "140121", "140122"}
 	for _, file := range files {
-		f, err := os.Create(s.fileName(file))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = f.Close()
+		err := ioutil.WriteFile(s.fileName(file), []byte{}, 0644)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -32,7 +29,7 @@ func TestFileName(t *testing.T) {
 func TestDownloadedWallpapers(t *testing.T) {
 	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
 	defer os.RemoveAll(testHome)
-	prepareTest(t, a.storage)
+	makeTestWallpapers(t, a.storage)
 
 	files, err := a.storage.DownloadedWallpapers()
 	if err != nil {
@@ -46,7 +43,7 @@ func TestDownloadedWallpapers(t *testing.T) {
 func TestIndexOf(t *testing.T) {
 	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
 	defer os.RemoveAll(testHome)
-	prepareTest(t, a.storage)
+	makeTestWallpapers(t, a.storage)
 	i, err := a.storage.IndexOf("140121")
 	if err != nil {
 		t.Fatal(err)
