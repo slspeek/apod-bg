@@ -14,7 +14,7 @@ const (
 	format   = "060102"
 )
 
-var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif))">`)
+var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif|png))"`)
 
 // APOD encapsulates communicating with apod.nasa.gov
 type APOD struct {
