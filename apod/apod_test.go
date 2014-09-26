@@ -10,15 +10,6 @@ import (
 	"testing"
 )
 
-const testDateString = "140121"
-const configJSON = `{"WallpaperDir":"bar"}`
-const setScriptSuccess = `#!/bin/bash
-exit 0
-`
-const setScriptFailure = `#!/bin/bash
-exit 5
-`
-
 func TestCollectTestData(t *testing.T) {
 	t.Skip()
 	resp, err := http.Get("http://timbeauchamp.tripod.com/moon/moon15.gif")

@@ -6,9 +6,8 @@ import (
 )
 
 func TestDownload(t *testing.T) {
-	//t.Skip()
 	a, testHome := frontendForTestConfigured(t, testRoundTrip{})
-	defer os.RemoveAll(testHome)
+	defer cleanUp(t, testHome)
 	_, err := a.loader.Download(testDateString)
 	if err != nil {
 		t.Fatalf("could not load page: %v", err)

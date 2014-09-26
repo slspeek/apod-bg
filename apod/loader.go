@@ -25,7 +25,7 @@ func (l *Loader) Download(isodate string) (bool, error) {
 	if imgURL == "" {
 		return false, nil
 	}
-	l.Notify(fmt.Sprintf("Downloading todays APOD-image"))
+	l.Notify(fmt.Sprintf("Downloading APOD-image for: %s", isodate))
 	file := l.storage.fileName(isodate)
 	err = l.APOD.Download(file, imgURL)
 	if err != nil {
@@ -35,11 +35,15 @@ func (l *Loader) Download(isodate string) (bool, error) {
 	return true, nil
 }
 
-// LoadRecentPast loads images from apod.nasa.gov to the wallpaper directory, for a number of days back
-func (l *Loader) LoadRecentPast(from time.Time, days int) {
+// LoadPeriod loads images from apod.nasa.gov to the wallpaper directory, for a number of days back
+func (l *Loader) LoadPeriod(from time.Time, days int) error {
 	for _, isodate := range l.days(from, days) {
-		l.Download(isodate)
+		_, err := l.Download(isodate)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (l *Loader) days(from time.Time, days int) []string {

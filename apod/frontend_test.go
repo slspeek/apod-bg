@@ -1,9 +1,11 @@
 package apod
 
 import (
+	"fmt"
 	"github.com/101loops/clock"
 	"github.com/haklop/gnotifier"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,26 +13,65 @@ import (
 	"time"
 )
 
+const testDateString = "140121"
+const configJSON = `{"WallpaperDir":"bar"}`
+const setScriptSuccess = `#!/bin/bash
+exit 0
+`
+const setScriptFailure = `#!/bin/bash
+echo Something went wrong
+exit 5
+`
+
+func resetFlags() {
+
+	zero := 0
+	trueB := true
+	falseB := false
+	emptyS := ""
+
+	info = &falseB
+	login = &falseB
+	logFileFlag = &emptyS
+	days = &zero
+	jump = &zero
+	configFlag = &emptyS
+	apodFlag = &falseB
+	mode = &falseB
+	nonotify = &trueB
+	noseed = &trueB
+}
+
 type nullLogger struct{}
 
 func (n nullLogger) Printf(f string, i ...interface{}) {
 }
 
 func setupTestHome(t testing.TB) string {
+	resetFlags()
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	testHome := filepath.Join(wd, "test-home")
+	testHome := filepath.Join(wd, fmt.Sprintf("test-home-%d", rand.Int63()))
 	if err := os.MkdirAll(testHome, 0755); err != nil {
 		t.Fatal(err)
 	}
 	os.Setenv("HOME", testHome)
+	t.Logf("%s CREATED", testHome)
 	return testHome
 }
 
-func makeStateFile(t testing.TB) {
-	err := ioutil.WriteFile(stateFile(), []byte(`{"DateCode":"140121","Options":"fit"}`), 0644)
+func cleanUp(t testing.TB, dir string) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%s was cleanly removed", dir)
+}
+
+func makeStateFile(t testing.TB, datecode, options string) {
+	err := ioutil.WriteFile(stateFile(), []byte(fmt.Sprintf(`{"DateCode":"%s","Options":"%s"}`, datecode, options)), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +80,6 @@ func makeStateFile(t testing.TB) {
 func frontendForTest(t *testing.T, tripper http.RoundTripper) (*Frontend, string) {
 	recorder := gnotifier.NewTestRecorder()
 	f := NewFrontend(nullLogger{}, Notifier{recorder.Notification})
-
 	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
 	m := clock.NewMock()
 	m.Set(t0)
@@ -62,21 +102,34 @@ func frontendForTestConfigured(t *testing.T, tripper http.RoundTripper) (*Fronte
 	return f, testHome
 }
 
-func TestJump(t *testing.T) {
-	f, testHome := frontendForTestConfigured(t, imageRoundTrip{})
-	defer os.RemoveAll(testHome)
-	makeTestWallpapers(t, f.storage)
+func TestJumpAtBeginBackward(t *testing.T) {
+	f, testHome := frontendForTestConfigured(t, nil)
+	defer cleanUp(t, testHome)
+	makeStateFile(t, "140120", "fit")
+	makeTestWallpapers(t, f.storage, "140120")
 	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(-1)
-	if err != nil {
-		t.Fatal(err)
+	if err.Error() != "Begin reached" {
+		t.Fatalf("Wrong error: %v", err)
+	}
+}
+
+func TestJumpAtBeginForward(t *testing.T) {
+	f, testHome := frontendForTestConfigured(t, nil)
+	defer cleanUp(t, testHome)
+	makeStateFile(t, "140120", "fit")
+	makeTestWallpapers(t, f.storage, "140120")
+	writeWallpaperScript(setScriptSuccess)
+	err := f.Jump(1)
+	if err.Error() != "End reached" {
+		t.Fatalf("Wrong error: %v", err)
 	}
 }
 
 func TestState(t *testing.T) {
 	APOD, testHome := frontendForTestConfigured(t, nil)
-	defer os.RemoveAll(testHome)
-	makeStateFile(t)
+	defer cleanUp(t, testHome)
+	makeStateFile(t, "140121", "fit")
 	rv, err := APOD.State()
 	if err != nil {
 		t.Fatalf("Error during call to State: %v\n", err)
@@ -88,7 +141,7 @@ func TestState(t *testing.T) {
 
 func RunConfiguration(t *testing.T, cfg string, expected string) {
 	f, testHome := frontendForTest(t, nil)
-	defer os.RemoveAll(testHome)
+	defer cleanUp(t, testHome)
 	f.Configure(cfg)
 	script := wallpaperSetScript()
 	bs, err := ioutil.ReadFile(script)
@@ -109,7 +162,7 @@ func TestConfiguration(t *testing.T) {
 
 func TestLoadconfigNonExistent(t *testing.T) {
 	f, testHome := frontendForTest(t, nil)
-	defer os.RemoveAll(testHome)
+	defer cleanUp(t, testHome)
 
 	err := f.Loadconfig()
 	if err.Error() != configNotFound {
@@ -119,7 +172,7 @@ func TestLoadconfigNonExistent(t *testing.T) {
 
 func TestLoadconfigExistent(t *testing.T) {
 	APOD, testHome := frontendForTestConfigured(t, nil)
-	defer os.RemoveAll(testHome)
+	defer cleanUp(t, testHome)
 
 	err := APOD.Loadconfig()
 	if err != nil {
@@ -140,7 +193,7 @@ func TestToday(t *testing.T) {
 
 func TestSetWallpaperSuccess(t *testing.T) {
 	front, testHome := frontendForTestConfigured(t, testRoundTrip{})
-	defer os.RemoveAll(testHome)
+	defer cleanUp(t, testHome)
 	writeWallpaperScript(setScriptSuccess)
 	err := front.SetWallpaper(State{DateCode: testDateString})
 	if err != nil {
@@ -150,17 +203,19 @@ func TestSetWallpaperSuccess(t *testing.T) {
 
 func TestSetWallpaperFailure(t *testing.T) {
 	front, testHome := frontendForTestConfigured(t, testRoundTrip{})
-	defer os.RemoveAll(testHome)
+	defer cleanUp(t, testHome)
 	writeWallpaperScript(setScriptFailure)
 	err := front.SetWallpaper(State{DateCode: testDateString})
-	if err.Error() != "exit status 5" {
-		t.Fatal(err)
+	if err.Error() != "Script error: exit status 5. Output: Something went wrong\n" {
+		t.Fatalf("Wrong error: %v", err)
 	}
 }
 
 func TestConfigurationE2e(t *testing.T) {
 	testHome := setupTestHome(t)
-	defer os.RemoveAll(testHome)
+	defer cleanUp(t, testHome)
+	resetFlags()
+
 	cfg := "barewm"
 	configFlag = &cfg
 	if err := Execute(); err != nil {
@@ -170,16 +225,14 @@ func TestConfigurationE2e(t *testing.T) {
 
 func TestJumpWithStateE2e(t *testing.T) {
 	f, testHome := frontendForTestConfigured(t, nil)
-	defer os.RemoveAll(testHome)
-	makeStateFile(t)
-	makeTestWallpapers(t, f.storage)
+	defer cleanUp(t, testHome)
+	makeStateFile(t, "140120", "fit")
+	makeTestWallpapers(t, f.storage, "140119", "140120")
 	writeWallpaperScript(setScriptSuccess)
+	resetFlags()
 
 	j := -1
 	jump = &j
-	nono := true
-	nonotify = &nono
-
 	if err := Execute(); err != nil {
 		t.Fatal(err)
 	}

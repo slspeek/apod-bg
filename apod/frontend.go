@@ -18,15 +18,16 @@ import (
 )
 
 var (
-	info       = flag.Bool("info", false, "open the APOD-page on the current background")
-	login      = flag.Bool("login", false, "do the procedure for APOD graphical login: download todays image and display it")
-	logfile    = flag.String("log", os.ExpandEnv("${HOME}/.config/apod-bg/apod-bg.log"), "logfile specification")
-	days       = flag.Int("fetch", 0, "days to go back downloading")
-	jump       = flag.Int("jump", 0, "jump N backgrounds further, use negative numbers to jump backward")
-	configFlag = flag.String("config", "", "initializes apod-bg for chosen window-manager")
-	apodFlag   = flag.Bool("apod", false, "opens the default browser on the Astronomy Picture of The Day")
-	mode       = flag.Bool("mode", false, "mode background sizing options: fit or zoom")
-	nonotify   = flag.Bool("nonotify", false, "do not send notifications to the desktop")
+	info        = flag.Bool("info", false, "open the APOD-page on the current background")
+	login       = flag.Bool("login", false, "do the procedure for APOD graphical login: download todays image and display it")
+	logFileFlag = flag.String("log", "", "logfile specification")
+	days        = flag.Int("fetch", 0, "days to go back downloading")
+	jump        = flag.Int("jump", 0, "jump N backgrounds further, use negative numbers to jump backward")
+	configFlag  = flag.String("config", "", "initializes apod-bg for chosen window-manager")
+	apodFlag    = flag.Bool("apod", false, "opens the default browser on the Astronomy Picture of The Day")
+	mode        = flag.Bool("mode", false, "mode background sizing options: fit or zoom")
+	nonotify    = flag.Bool("nonotify", false, "do not send notifications to the desktop")
+	noseed      = flag.Bool("noseed", false, "do not seed after configuring")
 )
 
 const (
@@ -37,6 +38,12 @@ const (
 	fit                = "fit"
 )
 
+func logFile() string {
+	if *logFileFlag == "" {
+		return os.ExpandEnv("${HOME}/.config/apod-bg/apod-bg.log")
+	}
+	return *logFileFlag
+}
 func configDir() string {
 	return os.ExpandEnv("${HOME}/.config/apod-bg")
 }
@@ -83,14 +90,6 @@ const configNotFound = "configuration file was not found. Please run apod-bg -co
 type logger interface {
 	Printf(f string, i ...interface{})
 }
-
-//type fileLogger struct {
-//Log *log.Logger
-//}
-
-//func (f *fileLogger) Printf(format string, i ...interface{}) {
-//f.Printf(format, i...)
-//}
 
 // config sets where to find the wallpaper directory.
 type config struct {
@@ -193,6 +192,25 @@ func (f *Frontend) store(s State) error {
 	return err
 }
 
+func (f *Frontend) Seed() error {
+	if *noseed {
+		return nil
+	}
+	if err := f.loader.LoadPeriod(f.Now(), 5); err != nil {
+		return err
+	}
+	ws, err := f.storage.DownloadedWallpapers()
+	if err != nil {
+		return err
+	}
+	if len(ws) == 0 {
+		return fmt.Errorf("No image in 5 days (are connected to internet?)")
+	}
+	s := State{DateCode: ws[len(ws)-1], Options: fit}
+	f.store(s)
+	return nil
+}
+
 // Now returns time.Now() and is fakable/
 func (f *Frontend) Now() time.Time {
 	return f.Clock.Now()
@@ -235,7 +253,11 @@ func (f *Frontend) Configure(cfg string) error {
 	default:
 		return fmt.Errorf("Unknown configuration type: %s\n", cfg)
 	}
-	return writeWallpaperScript(script)
+	if err := writeWallpaperScript(script); err != nil {
+		return err
+	}
+	f.Loadconfig()
+	return f.Seed()
 }
 
 // Loadconfig loads APOD config from disk or, failing that, returns an error.
@@ -315,9 +337,9 @@ func (f *Frontend) SetWallpaper(s State) error {
 	env = append(env, "WALLPAPER="+wallpaper)
 	env = append(env, "WALLPAPER_OPTIONS="+s.Options)
 	cmd.Env = env
-	err := cmd.Run()
+	output, err := cmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("Script error: %v. Output: %s", err, string(output))
 	}
 	return f.store(s)
 }
@@ -352,9 +374,10 @@ func initLogging() (*log.Logger, *os.File, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not create config dir")
 	}
-	f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+	f, err := os.OpenFile(logFile(), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+
 	if err != nil {
-		return nil, f, fmt.Errorf("Could not open logfile %q, because: %v\n", *logfile, err)
+		return nil, f, fmt.Errorf("Could not open logfile %q, because: %v\n", logFile(), err)
 	}
 	mw := io.MultiWriter(os.Stdout, f)
 
@@ -470,7 +493,7 @@ func Execute() error {
 	}
 
 	if *days > 0 {
-		front.loader.LoadRecentPast(front.Now(), *days)
+		front.loader.LoadPeriod(front.Now(), *days)
 	}
 
 	if *jump != 0 {
@@ -488,7 +511,7 @@ func Execute() error {
 	if *mode {
 		m, err := front.ToggleViewMode()
 		if err != nil {
-			err = fmt.Errorf("Could not mode viewing options: %v\n", err)
+			err = fmt.Errorf("Could not toggle viewing options: %v\n", err)
 			logger.Printf("%v\n", err)
 			return err
 

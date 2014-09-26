@@ -29,14 +29,14 @@ func TestE2eInitalConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove("apod-bg")
-	ac := exec.Command("./apod-bg", "-nonotify", "-config", "barewm")
+	ac := exec.Command("./apod-bg", "-nonotify", "-config", "barewm", "-noseed")
 	testHome := setupTestHome(t)
 	defer os.RemoveAll(testHome)
 	ac.Env = []string{fmt.Sprintf("HOME=%s", testHome)}
 
 	out, err = ac.CombinedOutput()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Error: %v Output: %v", err, string(out))
 	}
 	if !strings.Contains(string(out), "apod-bg was successfully configured") {
 		t.Fatalf("Expected success got: %s", string(out))

@@ -2,13 +2,11 @@ package apod
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 )
 
-func makeTestWallpapers(t testing.TB, s *Storage) {
-	files := []string{"140120", "140121", "140122"}
+func makeTestWallpapers(t testing.TB, s *Storage, files ...string) {
 	for _, file := range files {
 		err := ioutil.WriteFile(s.fileName(file), []byte{}, 0644)
 		if err != nil {
@@ -18,9 +16,9 @@ func makeTestWallpapers(t testing.TB, s *Storage) {
 }
 
 func TestFileName(t *testing.T) {
-	apod := Storage{Config: &config{WallpaperDir: "foo"}}
+	s := Storage{Config: &config{WallpaperDir: "foo"}}
 	expected := filepath.Join("foo", "apod-img-140121")
-	got := apod.fileName(testDateString)
+	got := s.fileName(testDateString)
 	if expected != got {
 		t.Fatalf("Expected: %v, got %v", expected, got)
 	}
@@ -28,8 +26,8 @@ func TestFileName(t *testing.T) {
 
 func TestDownloadedWallpapers(t *testing.T) {
 	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
-	defer os.RemoveAll(testHome)
-	makeTestWallpapers(t, a.storage)
+	defer cleanUp(t, testHome)
+	makeTestWallpapers(t, a.storage, "140120", "140121", "140122")
 
 	files, err := a.storage.DownloadedWallpapers()
 	if err != nil {
@@ -40,15 +38,27 @@ func TestDownloadedWallpapers(t *testing.T) {
 	}
 }
 
-func TestIndexOf(t *testing.T) {
+func TestIndexOfPresent(t *testing.T) {
 	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
-	defer os.RemoveAll(testHome)
-	makeTestWallpapers(t, a.storage)
+	defer cleanUp(t, testHome)
+	makeTestWallpapers(t, a.storage, "140120", "140121")
 	i, err := a.storage.IndexOf("140121")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if i != 1 {
 		t.Fatalf("Expected 1, got %d", i)
+	}
+}
+func TestIndexOfAbsent(t *testing.T) {
+	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
+	defer cleanUp(t, testHome)
+	makeTestWallpapers(t, a.storage)
+	_, err := a.storage.IndexOf("130101")
+	if err == nil {
+		t.Fatal("Expected an error, got nil")
+	}
+	if err.Error() != "130101 was not found" {
+		t.Fatalf("Wrong error: %v", err.Error())
 	}
 }
