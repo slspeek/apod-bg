@@ -2,6 +2,7 @@ package apod
 
 import (
 	"bufio"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
@@ -9,6 +10,26 @@ import (
 	"strings"
 	"testing"
 )
+
+func testApod() *APOD {
+	a := NewAPOD()
+	a.Site = "http://localhost:8765/"
+	return a
+}
+
+func TestContainsImageWithServer(t *testing.T) {
+	go func() {
+		http.ListenAndServe(":8765", http.FileServer(http.Dir("testdata/apod.nasa.gov/")))
+	}()
+	testHome := setupTestHome(t)
+	defer cleanUp(t, testHome)
+	a := testApod()
+	url, err := a.ContainsImage(a.UrlForDate(testDateSeptember))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, a.Site+"apod/image/1409/m8_chua_2500.jpg", url)
+}
 
 func TestCollectTestData(t *testing.T) {
 	t.Skip()
@@ -71,7 +92,7 @@ func (l apodRoundTrip) RoundTrip(*http.Request) (*http.Response, error) {
 }
 
 func TestContainsImage(t *testing.T) {
-	apod := APOD{Client: &http.Client{Transport: apodRoundTrip{}}}
+	apod := APOD{Client: &http.Client{Transport: apodRoundTrip{}}, Site: apodSite}
 	url, err := apod.ContainsImage("http://apod.nasa.gov/apod/astropix.html")
 	if err != nil {
 		t.Fatal("could not load page")

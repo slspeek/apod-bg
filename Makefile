@@ -31,4 +31,15 @@ coverage:
 	gocov test github.com/slspeek/apod-bg/apod | gocov-html > report/coverage-apod.html
 	#gocov test github.com/slspeek/apod-bg | gocov-html > report/coverage-main.html
 	
-
+.ONESHELL:
+inittestdata:
+	cd testdata
+	wget -c -x http://apod.nasa.gov/apod/ap140920.html
+	wget -c -x http://apod.nasa.gov/apod/ap140921.html
+	wget -c -x http://apod.nasa.gov/apod/ap140922.html
+	wget -c -x http://apod.nasa.gov/apod/ap140923.html
+	wget -c -x http://apod.nasa.gov/apod/ap140924.html
+	wget -c -x http://apod.nasa.gov/apod/image/1409/ShorelineoftheUniverse.jpg
+	wget -c -x http://apod.nasa.gov/apod/image/1409/saturnequinox_cassini_7227.jpg
+	wget -c -x http://apod.nasa.gov/apod/image/1409/volcanicpillar_vetter_1400.jpg
+	wget -c -x http://apod.nasa.gov/apod/image/1409/m8_chua_2500.jpg

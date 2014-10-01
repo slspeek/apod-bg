@@ -14,12 +14,14 @@ import (
 )
 
 const testDateString = "140121"
+const testDateSeptember = "140924"
 const configJSON = `{"WallpaperDir":"bar"}`
 const setScriptSuccess = `#!/bin/bash
 exit 0
 `
 const setScriptFailure = `#!/bin/bash
 echo Something went wrong
+echo Fault 1>&2
 exit 5
 `
 
@@ -206,7 +208,7 @@ func TestSetWallpaperFailure(t *testing.T) {
 	defer cleanUp(t, testHome)
 	writeWallpaperScript(setScriptFailure)
 	err := front.SetWallpaper(State{DateCode: testDateString})
-	if err.Error() != "Script error: exit status 5. Output: Something went wrong\n" {
+	if err.Error() != "Script error: exit status 5. Output: Something went wrong\nFault\n" {
 		t.Fatalf("Wrong error: %v", err)
 	}
 }

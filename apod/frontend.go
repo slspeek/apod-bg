@@ -69,7 +69,7 @@ fi
 `
 const setScriptLXDE = `#!/bin/bash
 if test $WALLPAPER_OPTIONS = zoom; then
-	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=stretch
+	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=crop
 else
 	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=fit
 fi
@@ -337,7 +337,7 @@ func (f *Frontend) SetWallpaper(s State) error {
 	env = append(env, "WALLPAPER="+wallpaper)
 	env = append(env, "WALLPAPER_OPTIONS="+s.Options)
 	cmd.Env = env
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Script error: %v. Output: %s", err, string(output))
 	}

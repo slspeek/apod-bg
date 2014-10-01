@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	apodBase = "http://apod.nasa.gov/apod/"
+	apodSite = "http://apod.nasa.gov/"
 	format   = "060102"
 )
 
@@ -19,12 +19,14 @@ var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif|png))"`)
 // APOD encapsulates communicating with apod.nasa.gov
 type APOD struct {
 	Client *http.Client
+	Site   string
 }
 
 // NewAPOD constructs a new APOD object
 func NewAPOD() *APOD {
 	a := APOD{
 		Client: http.DefaultClient,
+		Site:   apodSite,
 	}
 	return &a
 }
@@ -37,7 +39,7 @@ func (a *APOD) ContainsImage(url string) (string, error) {
 	}
 	m := imageExpr.FindStringSubmatch(content)
 	if m != nil && m[1] != "" {
-		return apodBase + m[1], nil
+		return a.Site + "apod/" + m[1], nil
 	}
 	return "", nil
 }
@@ -71,7 +73,7 @@ func exists(path string) (bool, error) {
 
 // UrlForDate returns the URL for the APOD page for the given ISO date.
 func (a *APOD) UrlForDate(isodate string) string {
-	return fmt.Sprintf("http://apod.nasa.gov/apod/ap%s.html", isodate)
+	return fmt.Sprintf("%sapod/ap%s.html", apodSite, isodate)
 }
 
 func (a *APOD) loadPage(url string) (string, error) {
