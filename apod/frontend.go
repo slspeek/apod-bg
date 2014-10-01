@@ -31,7 +31,7 @@ var (
 )
 
 const (
-	imgprefix          = "apod-img-"
+	imgPrefix          = "apod-img-"
 	stateFileBasename  = "now-showing"
 	configFileBasename = "config.json"
 	zoom               = "zoom"
@@ -206,7 +206,7 @@ func (f *Frontend) Seed() error {
 	if len(ws) == 0 {
 		return fmt.Errorf("No image in 5 days (are connected to internet?)")
 	}
-	s := State{DateCode: ws[len(ws)-1], Options: fit}
+	s := State{DateCode: ws[len(ws)-1][len(imgPrefix):], Options: fit}
 	f.store(s)
 	return nil
 }
@@ -324,7 +324,7 @@ func (f *Frontend) Jump(n int) error {
 	if toGo < 0 {
 		return fmt.Errorf("Begin reached")
 	}
-	code := all[toGo][len(imgprefix):]
+	code := all[toGo][len(imgPrefix):]
 	st := State{DateCode: code, Options: fit}
 	return f.SetWallpaper(st)
 }

@@ -54,5 +54,5 @@ func (s *Storage) fileName(isodate string) string {
 }
 
 func (s *Storage) fileBaseName(isodate string) string {
-	return fmt.Sprintf(imgprefix+"%s", isodate)
+	return fmt.Sprintf(imgPrefix+"%s", isodate)
 }
