@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
 	"github.com/101loops/clock"
 	"github.com/haklop/gnotifier"
@@ -28,10 +27,10 @@ var (
 	mode        = flag.Bool("mode", false, "mode background sizing options: fit or zoom")
 	nonotify    = flag.Bool("nonotify", false, "do not send notifications to the desktop")
 	noseed      = flag.Bool("noseed", false, "do not seed after configuring")
+	randomFlag  = flag.Bool("random", false, "pick a random archive picture")
 )
 
 const (
-	imgPrefix          = "apod-img-"
 	stateFileBasename  = "now-showing"
 	configFileBasename = "config.json"
 	zoom               = "zoom"
@@ -44,6 +43,7 @@ func logFile() string {
 	}
 	return *logFileFlag
 }
+
 func configDir() string {
 	return os.ExpandEnv("${HOME}/.config/apod-bg")
 }
@@ -108,6 +108,14 @@ func (c *config) makeWallpaperDir() error {
 	return os.MkdirAll(c.WallpaperDir, 0700)
 }
 
+func (c *config) fileName(isodate ADate) string {
+	return filepath.Join(c.WallpaperDir, c.fileBaseName(isodate))
+}
+
+func (c *config) fileBaseName(isodate ADate) string {
+	return fmt.Sprintf(imgPrefix+"%s", isodate.String())
+}
+
 func MakeConfigDir() error {
 	err := os.MkdirAll(configDir(), 0700)
 	if err != nil {
@@ -146,7 +154,7 @@ type Frontend struct {
 func NewFrontend(logger logger, notifier Notifier) *Frontend {
 	APOD := NewAPOD()
 	s := &Storage{}
-	l := &Loader{APOD: APOD, storage: s, logger: logger, Notifier: notifier}
+	l := &Loader{APOD: APOD, logger: logger, Notifier: notifier}
 	return &Frontend{Clock: clock.New(),
 		Log:      logger,
 		Notifier: notifier,
@@ -159,7 +167,7 @@ func NewFrontend(logger logger, notifier Notifier) *Frontend {
 
 // State defines the date of the apod-image being shown and display options
 type State struct {
-	DateCode string
+	DateCode ADate
 	Options  string
 }
 
@@ -181,7 +189,7 @@ func (f *Frontend) State() (State, error) {
 	return s, err
 }
 
-func (f *Frontend) store(s State) error {
+func store(s State) error {
 	fd, err := os.Create(stateFile())
 	if err != nil {
 		return err
@@ -196,7 +204,7 @@ func (f *Frontend) Seed() error {
 	if *noseed {
 		return nil
 	}
-	if err := f.loader.LoadPeriod(f.Now(), 5); err != nil {
+	if err := f.loader.LoadPeriod(f.Today(), 5); err != nil {
 		return err
 	}
 	ws, err := f.storage.DownloadedWallpapers()
@@ -206,20 +214,15 @@ func (f *Frontend) Seed() error {
 	if len(ws) == 0 {
 		return fmt.Errorf("No image in 5 days (are connected to internet?)")
 	}
-	s := State{DateCode: ws[len(ws)-1][len(imgPrefix):], Options: fit}
-	f.store(s)
+	s := State{DateCode: ws[len(ws)-1], Options: fit}
+	store(s)
 	return nil
 }
 
-// Now returns time.Now() and is fakable/
-func (f *Frontend) Now() time.Time {
-	return f.Clock.Now()
-}
-
 // Today returns the date of today in APOD formatted string.
-func (f *Frontend) Today() string {
-	t := f.Now()
-	return t.Format(format)
+func (f *Frontend) Today() ADate {
+	t := f.Clock.Now()
+	return NewADate(t)
 }
 
 // configure initializes the configuration according the config argument.
@@ -279,12 +282,13 @@ func (f *Frontend) Loadconfig() error {
 		return err
 	}
 	f.storage.Config = f.Config
+	f.loader.Config = f.Config
 	return err
 }
 
 // OpenAPOD opens the web page at apod.nasa.gov for APOD given day in the default browser.
-func (f *Frontend) OpenAPOD(isodate string) error {
-	url := f.APOD.UrlForDate(isodate)
+func (f *Frontend) OpenAPOD(isodate ADate) error {
+	url := f.APOD.UrlForDate(ADate(isodate))
 	return open.Start(url)
 }
 
@@ -324,14 +328,14 @@ func (f *Frontend) Jump(n int) error {
 	if toGo < 0 {
 		return fmt.Errorf("Begin reached")
 	}
-	code := all[toGo][len(imgPrefix):]
+	code := all[toGo]
 	st := State{DateCode: code, Options: fit}
 	return f.SetWallpaper(st)
 }
 
 // SetWallpaper sets the wallpaper to the image from the wallpaper directory for the given date.
 func (f *Frontend) SetWallpaper(s State) error {
-	wallpaper := f.storage.fileName(s.DateCode)
+	wallpaper := f.Config.fileName(s.DateCode)
 	cmd := exec.Command(wallpaperSetScript())
 	env := os.Environ()
 	env = append(env, "WALLPAPER="+wallpaper)
@@ -341,7 +345,7 @@ func (f *Frontend) SetWallpaper(s State) error {
 	if err != nil {
 		return fmt.Errorf("Script error: %v. Output: %s", err, string(output))
 	}
-	return f.store(s)
+	return store(s)
 }
 
 // ToggleViewMode toggles the view mode fill/zoom. It returns the new state.
@@ -445,7 +449,7 @@ func Execute() error {
 
 	if *login {
 		today := front.Today()
-		if downloaded, err := front.storage.IsDownloaded(today); downloaded || err != nil {
+		if downloaded, err := front.Config.IsDownloaded(today); downloaded || err != nil {
 			if err != nil {
 				err = fmt.Errorf("Could not check whether today was downloaded, because: %v\n", err)
 				logger.Printf("%v\n", err)
@@ -493,7 +497,7 @@ func Execute() error {
 	}
 
 	if *days > 0 {
-		front.loader.LoadPeriod(front.Now(), *days)
+		front.loader.LoadPeriod(front.Today(), *days)
 	}
 
 	if *jump != 0 {

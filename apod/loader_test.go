@@ -12,7 +12,7 @@ func TestDownload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not load page: %v", err)
 	}
-	image := a.storage.fileName(testDateString)
+	image := a.Config.fileName(testDateString)
 	i, err := os.Open(image)
 	if err != nil {
 		t.Fatal(err)

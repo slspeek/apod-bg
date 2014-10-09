@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-func makeTestWallpapers(t testing.TB, s *Storage, files ...string) {
+func makeTestWallpapers(t testing.TB, c *config, files ...string) {
 	for _, file := range files {
-		err := ioutil.WriteFile(s.fileName(file), []byte{}, 0644)
+		err := ioutil.WriteFile(c.fileName(ADate(file)), []byte{}, 0644)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -16,9 +16,9 @@ func makeTestWallpapers(t testing.TB, s *Storage, files ...string) {
 }
 
 func TestFileName(t *testing.T) {
-	s := Storage{Config: &config{WallpaperDir: "foo"}}
+	c := config{WallpaperDir: "foo"}
 	expected := filepath.Join("foo", "apod-img-140121")
-	got := s.fileName(testDateString)
+	got := c.fileName(testDateString)
 	if expected != got {
 		t.Fatalf("Expected: %v, got %v", expected, got)
 	}
@@ -27,7 +27,7 @@ func TestFileName(t *testing.T) {
 func TestDownloadedWallpapers(t *testing.T) {
 	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
 	defer cleanUp(t, testHome)
-	makeTestWallpapers(t, a.storage, "140120", "140121", "140122")
+	makeTestWallpapers(t, a.Config, "140120", "140121", "140122")
 
 	files, err := a.storage.DownloadedWallpapers()
 	if err != nil {
@@ -41,7 +41,7 @@ func TestDownloadedWallpapers(t *testing.T) {
 func TestIndexOfPresent(t *testing.T) {
 	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
 	defer cleanUp(t, testHome)
-	makeTestWallpapers(t, a.storage, "140120", "140121")
+	makeTestWallpapers(t, a.Config, "140120", "140121")
 	i, err := a.storage.IndexOf("140121")
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestIndexOfPresent(t *testing.T) {
 func TestIndexOfAbsent(t *testing.T) {
 	a, testHome := frontendForTestConfigured(t, imageRoundTrip{})
 	defer cleanUp(t, testHome)
-	makeTestWallpapers(t, a.storage)
+	makeTestWallpapers(t, a.Config)
 	_, err := a.storage.IndexOf("130101")
 	if err == nil {
 		t.Fatal("Expected an error, got nil")

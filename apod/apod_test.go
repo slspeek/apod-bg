@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testApod() *APOD {
@@ -17,9 +18,20 @@ func testApod() *APOD {
 	return a
 }
 
+func TestADateString(t *testing.T) {
+	a := ADate("140121")
+	assert.Equal(t, "140121", a.String())
+}
+
+func TestADateDate(t *testing.T) {
+	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
+	a := ADate("140121")
+	assert.Equal(t, &t0, a.Date())
+}
+
 func TestContainsImageWithServer(t *testing.T) {
 	go func() {
-		http.ListenAndServe(":8765", http.FileServer(http.Dir("testdata/apod.nasa.gov/")))
+		http.ListenAndServe(":8765", http.FileServer(http.Dir("../testdata/apod.nasa.gov/")))
 	}()
 	testHome := setupTestHome(t)
 	defer cleanUp(t, testHome)
@@ -50,11 +62,9 @@ func TestCollectTestData(t *testing.T) {
 }
 
 func TestUrlForDate(t *testing.T) {
-	apod := APOD{}
+	apod := APOD{Site: apodSite}
 	url := apod.UrlForDate(testDateString)
-	if url != "http://apod.nasa.gov/apod/ap140121.html" {
-		t.Errorf("Expected: http://apod.nasa.gov/apod/ap140121.html, got %s", url)
-	}
+	assert.Equal(t, "http://apod.nasa.gov/apod/ap140121.html", url)
 }
 
 type testRoundTrip struct{}

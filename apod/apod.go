@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"time"
 )
 
 const (
@@ -15,6 +16,25 @@ const (
 )
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif|png))"`)
+
+// ADate is an APOD date string
+type ADate string
+
+func NewADate(t time.Time) ADate {
+	return ADate(t.Format(format))
+}
+
+func (d *ADate) String() string {
+	return string(*d)
+}
+
+func (d *ADate) Date() *time.Time {
+	t, err := time.Parse(format, d.String())
+	if err != nil {
+		return nil
+	}
+	return &t
+}
 
 // APOD encapsulates communicating with apod.nasa.gov
 type APOD struct {
@@ -72,8 +92,8 @@ func exists(path string) (bool, error) {
 }
 
 // UrlForDate returns the URL for the APOD page for the given ISO date.
-func (a *APOD) UrlForDate(isodate string) string {
-	return fmt.Sprintf("%sapod/ap%s.html", apodSite, isodate)
+func (a *APOD) UrlForDate(isodate ADate) string {
+	return fmt.Sprintf("%sapod/ap%s.html", a.Site, isodate.String())
 }
 
 func (a *APOD) loadPage(url string) (string, error) {

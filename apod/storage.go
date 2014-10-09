@@ -3,17 +3,22 @@ package apod
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 )
+
+const imgPrefix = "apod-img-"
+
+func stripPrefix(s string) string {
+	return s[len(imgPrefix):]
+}
 
 type Storage struct {
 	Config *config
 }
 
 // IsDownloaded checks whether an image file is downloaded for a given date.
-func (s *Storage) IsDownloaded(isodate string) (bool, error) {
-	file := s.fileName(isodate)
+func (c *config) IsDownloaded(isodate ADate) (bool, error) {
+	file := c.fileName(isodate)
 	fileExists, err := exists(file)
 	if err != nil {
 		return false, err
@@ -21,7 +26,7 @@ func (s *Storage) IsDownloaded(isodate string) (bool, error) {
 	return fileExists, nil
 }
 
-func (s *Storage) DownloadedWallpapers() ([]string, error) {
+func (s *Storage) DownloadedWallpapers() ([]ADate, error) {
 	dir, err := os.Open(s.Config.WallpaperDir)
 	if err != nil {
 		return nil, err
@@ -31,28 +36,23 @@ func (s *Storage) DownloadedWallpapers() ([]string, error) {
 		return nil, err
 	}
 	sort.Strings(files)
-	return files, nil
+	dates := []ADate{}
+	for _, f := range files {
+		dates = append(dates, ADate(stripPrefix(f)))
+	}
+	return dates, nil
 }
 
 // IndexOf returns the index of an image in the wallpaper directory.
-func (s *Storage) IndexOf(isodate string) (int, error) {
-	target := s.fileBaseName(isodate)
+func (s *Storage) IndexOf(isodate ADate) (int, error) {
 	all, err := s.DownloadedWallpapers()
 	if err != nil {
 		return 0, err
 	}
 	for i, elem := range all {
-		if elem == target {
+		if elem == isodate {
 			return i, nil
 		}
 	}
 	return 0, fmt.Errorf("%s was not found", isodate)
-}
-
-func (s *Storage) fileName(isodate string) string {
-	return filepath.Join(s.Config.WallpaperDir, s.fileBaseName(isodate))
-}
-
-func (s *Storage) fileBaseName(isodate string) string {
-	return fmt.Sprintf(imgPrefix+"%s", isodate)
 }

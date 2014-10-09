@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/101loops/clock"
 	"github.com/haklop/gnotifier"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -42,6 +43,7 @@ func resetFlags() {
 	mode = &falseB
 	nonotify = &trueB
 	noseed = &trueB
+	randomFlag = &falseB
 }
 
 type nullLogger struct{}
@@ -73,7 +75,8 @@ func cleanUp(t testing.TB, dir string) {
 }
 
 func makeStateFile(t testing.TB, datecode, options string) {
-	err := ioutil.WriteFile(stateFile(), []byte(fmt.Sprintf(`{"DateCode":"%s","Options":"%s"}`, datecode, options)), 0644)
+	s := State{DateCode: ADate(datecode), Options: options}
+	err := store(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +111,7 @@ func TestJumpAtBeginBackward(t *testing.T) {
 	f, testHome := frontendForTestConfigured(t, nil)
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
-	makeTestWallpapers(t, f.storage, "140120")
+	makeTestWallpapers(t, f.Config, "140120")
 	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(-1)
 	if err.Error() != "Begin reached" {
@@ -120,7 +123,7 @@ func TestJumpAtBeginForward(t *testing.T) {
 	f, testHome := frontendForTestConfigured(t, nil)
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
-	makeTestWallpapers(t, f.storage, "140120")
+	makeTestWallpapers(t, f.Config, "140120")
 	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(1)
 	if err.Error() != "End reached" {
@@ -188,9 +191,9 @@ func TestToday(t *testing.T) {
 	m.Set(t0)
 
 	front := Frontend{Clock: m}
-	if front.Today() != testDateString {
-		t.Errorf("Expected %v, got %v", testDateString, front.Today())
-	}
+	var ad ADate
+	ad = front.Today()
+	assert.Equal(t, ad.String(), testDateString)
 }
 
 func TestSetWallpaperSuccess(t *testing.T) {
@@ -229,7 +232,7 @@ func TestJumpWithStateE2e(t *testing.T) {
 	f, testHome := frontendForTestConfigured(t, nil)
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
-	makeTestWallpapers(t, f.storage, "140119", "140120")
+	makeTestWallpapers(t, f.Config, "140119", "140120")
 	writeWallpaperScript(setScriptSuccess)
 	resetFlags()
 

@@ -2,19 +2,18 @@ package apod
 
 import (
 	"fmt"
-	"time"
 )
 
 type Loader struct {
-	APOD    *APOD
-	storage *Storage
+	APOD   *APOD
+	Config *config
 	Notifier
 	logger
 }
 
 // Download downloads the image from apod.nasa.gov for the given date.
-func (l *Loader) Download(isodate string) (bool, error) {
-	if downloaded, _ := l.storage.IsDownloaded(isodate); downloaded {
+func (l *Loader) Download(isodate ADate) (bool, error) {
+	if downloaded, _ := l.Config.IsDownloaded(isodate); downloaded {
 		return true, nil
 	}
 	pageURL := l.APOD.UrlForDate(isodate)
@@ -26,7 +25,7 @@ func (l *Loader) Download(isodate string) (bool, error) {
 		return false, nil
 	}
 	l.Notify(fmt.Sprintf("Downloading APOD-image for: %s", isodate))
-	file := l.storage.fileName(isodate)
+	file := l.Config.fileName(isodate)
 	err = l.APOD.Download(file, imgURL)
 	if err != nil {
 		return true, err
@@ -36,7 +35,7 @@ func (l *Loader) Download(isodate string) (bool, error) {
 }
 
 // LoadPeriod loads images from apod.nasa.gov to the wallpaper directory, for a number of days back
-func (l *Loader) LoadPeriod(from time.Time, days int) error {
+func (l *Loader) LoadPeriod(from ADate, days int) error {
 	for _, isodate := range l.days(from, days) {
 		_, err := l.Download(isodate)
 		if err != nil {
@@ -46,10 +45,10 @@ func (l *Loader) LoadPeriod(from time.Time, days int) error {
 	return nil
 }
 
-func (l *Loader) days(from time.Time, days int) []string {
-	var dates []string
+func (l *Loader) days(from ADate, days int) []ADate {
+	var dates []ADate
 	for i := 1; i < days+1; i++ {
-		dates = append(dates, from.AddDate(0, 0, -i).Format(format))
+		dates = append(dates, NewADate(from.Date().AddDate(0, 0, -i)))
 	}
 	return dates
 }
