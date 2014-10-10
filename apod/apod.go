@@ -28,6 +28,15 @@ func (d *ADate) String() string {
 	return string(*d)
 }
 
+func (d *ADate) Back() *ADate {
+	da := d.Date()
+	if da == nil {
+		return nil
+	}
+	p := NewADate(da.AddDate(0, 0, -1))
+	return &p
+}
+
 func (d *ADate) Date() *time.Time {
 	t, err := time.Parse(format, d.String())
 	if err != nil {
@@ -64,6 +73,7 @@ func (a *APOD) ContainsImage(url string) (string, error) {
 	return "", nil
 }
 
+// Download fetches the url argument and stores the result in the path in the file argument
 func (a *APOD) Download(file, url string) error {
 	output, err := os.Create(file)
 	if err != nil {

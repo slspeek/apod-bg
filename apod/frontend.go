@@ -7,11 +7,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
-	"github.com/101loops/clock"
 	"github.com/haklop/gnotifier"
 	"github.com/skratchdot/open-golang/open"
 )
@@ -27,6 +28,7 @@ var (
 	mode        = flag.Bool("mode", false, "mode background sizing options: fit or zoom")
 	nonotify    = flag.Bool("nonotify", false, "do not send notifications to the desktop")
 	noseed      = flag.Bool("noseed", false, "do not seed after configuring")
+	dateFlag    = flag.String("date", "", "specify a date to be considered as now (for testing)")
 	randomFlag  = flag.Bool("random", false, "pick a random archive picture")
 )
 
@@ -142,7 +144,6 @@ func (n *Notifier) Notify(mesg string) {
 }
 
 type Frontend struct {
-	Clock  clock.Clock
 	Log    logger
 	Config *config
 	Notifier
@@ -155,7 +156,7 @@ func NewFrontend(logger logger, notifier Notifier) *Frontend {
 	APOD := NewAPOD()
 	s := &Storage{}
 	l := &Loader{APOD: APOD, logger: logger, Notifier: notifier}
-	return &Frontend{Clock: clock.New(),
+	return &Frontend{
 		Log:      logger,
 		Notifier: notifier,
 		APOD:     APOD,
@@ -204,25 +205,26 @@ func (f *Frontend) Seed() error {
 	if *noseed {
 		return nil
 	}
-	if err := f.loader.LoadPeriod(f.Today(), 5); err != nil {
-		return err
+	date := f.Today()
+	for i := 0; i < 7; i++ {
+		loaded, err := f.loader.Download(date)
+		date = *date.Back()
+		if err != nil {
+			continue
+		}
+		if loaded {
+			break
+		}
 	}
-	ws, err := f.storage.DownloadedWallpapers()
-	if err != nil {
-		return err
-	}
-	if len(ws) == 0 {
-		return fmt.Errorf("No image in 5 days (are connected to internet?)")
-	}
-	s := State{DateCode: ws[len(ws)-1], Options: fit}
-	store(s)
-	return nil
+	return f.RandomArchive()
 }
 
 // Today returns the date of today in APOD formatted string.
 func (f *Frontend) Today() ADate {
-	t := f.Clock.Now()
-	return NewADate(t)
+	if *dateFlag != "" {
+		return ADate(*dateFlag)
+	}
+	return NewADate(time.Now())
 }
 
 // configure initializes the configuration according the config argument.
@@ -343,7 +345,7 @@ func (f *Frontend) SetWallpaper(s State) error {
 	cmd.Env = env
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Script error: %v. Output: %s", err, string(output))
+		return fmt.Errorf("Error running Wallpaper-Set-Script: %v. Output: %s", err, string(output))
 	}
 	return store(s)
 }
@@ -387,6 +389,40 @@ func initLogging() (*log.Logger, *os.File, error) {
 
 	logger = log.New(mw, "", log.LstdFlags)
 	return logger, f, nil
+}
+
+// RunAtLogin should be configured to run when the user starts her
+// windowmanager. It checks for a new APOD image. If there is a new
+// image is sets this as background, otherwise it display a random
+// archive image.
+func (f *Frontend) RunAtLogin() error {
+	return nil
+}
+
+// RandomArchive picks a random image from the already downloaded
+// images
+func (f *Frontend) RandomArchive() error {
+	rand.Seed(time.Now().Unix())
+	bs, err := f.storage.DownloadedWallpapers()
+	if err != nil {
+		return err
+	}
+	n := len(bs)
+	if n == 0 {
+		return fmt.Errorf("No backgrounds downloaded yet")
+	}
+	if n > 1 {
+		// Don't want yesterdays wallpaper
+		n -= 1
+	}
+	pick := bs[rand.Intn(n)]
+	s, err := f.State()
+	if err != nil {
+		return err
+	}
+	s.DateCode = pick
+	f.SetWallpaper(s)
+	return nil
 }
 
 // Execute is the entry point for the apod-bg command
@@ -433,6 +469,10 @@ func Execute() error {
 			logger.Printf(mesg)
 		}
 		return nil
+	}
+
+	if *randomFlag {
+		return front.RandomArchive()
 	}
 
 	if *info {

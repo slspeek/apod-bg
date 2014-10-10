@@ -29,8 +29,15 @@ overrides the default log file location which is $HOME/.config/apod-bg/apod-bg.l
 .TP
 \-login
 do the procedure for a graphical login: download todays image and display it
+.TP
 \-mode
 toggle background sizing options: fit or zoom
+.TP
+\-random
+shows a random archived wallpaper
+.TP
+\-date
+runs as if the clock was set to date (mostly for testing, but usable with fetch)
 .SH EXAMPLES
 .TP
 Configure your window-manager for apod-bg to be a bare window-manager like awesome, i3 or twm

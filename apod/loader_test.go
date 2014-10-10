@@ -1,27 +1,20 @@
 package apod
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 )
 
 func TestDownload(t *testing.T) {
-	a, testHome := frontendForTestConfigured(t, testRoundTrip{})
+	a, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
-	_, err := a.loader.Download(testDateString)
-	if err != nil {
-		t.Fatalf("could not load page: %v", err)
-	}
-	image := a.Config.fileName(testDateString)
+	_, err := a.loader.Download(testDateSeptember)
+	assert.NoError(t, err)
+	image := a.Config.fileName(testDateSeptember)
 	i, err := os.Open(image)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	info, err := i.Stat()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Size() != 2185 {
-		t.Fatalf("Wrong size expected 2185, got: %d", info.Size())
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, info.Size(), 3684878, "Wrong downloaded file size")
 }

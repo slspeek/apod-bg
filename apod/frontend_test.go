@@ -2,20 +2,21 @@ package apod
 
 import (
 	"fmt"
-	"github.com/101loops/clock"
 	"github.com/haklop/gnotifier"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
+var testDate = time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
+
 const testDateString = "140121"
 const testDateSeptember = "140924"
+const testDateYoutube = "140922"
 const configJSON = `{"WallpaperDir":"bar"}`
 const setScriptSuccess = `#!/bin/bash
 exit 0
@@ -25,6 +26,16 @@ echo Something went wrong
 echo Fault 1>&2
 exit 5
 `
+
+func unsetNoseedFlag() {
+	falseB := false
+	noseed = &falseB
+}
+
+func setDateFlag(date string) {
+	dateFlag = &date
+	return
+}
 
 func resetFlags() {
 
@@ -54,9 +65,7 @@ func (n nullLogger) Printf(f string, i ...interface{}) {
 func setupTestHome(t testing.TB) string {
 	resetFlags()
 	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	testHome := filepath.Join(wd, fmt.Sprintf("test-home-%d", rand.Int63()))
 	if err := os.MkdirAll(testHome, 0755); err != nil {
 		t.Fatal(err)
@@ -68,94 +77,90 @@ func setupTestHome(t testing.TB) string {
 
 func cleanUp(t testing.TB, dir string) {
 	err := os.RemoveAll(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	t.Logf("%s was cleanly removed", dir)
 }
 
 func makeStateFile(t testing.TB, datecode, options string) {
 	s := State{DateCode: ADate(datecode), Options: options}
 	err := store(s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }
 
-func frontendForTest(t *testing.T, tripper http.RoundTripper) (*Frontend, string) {
+func frontendForTest(t *testing.T) (*Frontend, string) {
 	recorder := gnotifier.NewTestRecorder()
 	f := NewFrontend(nullLogger{}, Notifier{recorder.Notification})
-	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
-	m := clock.NewMock()
-	m.Set(t0)
-	f.Clock = m
-	f.APOD.Client = &http.Client{Transport: tripper}
-
+	setDateFlag("140921")
+	f.APOD.Site = testAPODSite
 	return f, setupTestHome(t)
 }
 
-func frontendForTestConfigured(t *testing.T, tripper http.RoundTripper) (*Frontend, string) {
-	f, testHome := frontendForTest(t, tripper)
+func frontendForTestConfigured(t *testing.T) (*Frontend, string) {
+	f, testHome := frontendForTest(t)
 	err := f.Configure("barewm")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	err = f.Loadconfig()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	return f, testHome
 }
 
+func TestSeed(t *testing.T) {
+	f, testHome := frontendForTest(t)
+	defer cleanUp(t, testHome)
+	unsetNoseedFlag()
+	err := f.Configure("barewm")
+	assert.NoError(t, err)
+}
+
+func TestSeedYoutube(t *testing.T) {
+	f, testHome := frontendForTest(t)
+	defer cleanUp(t, testHome)
+	setDateFlag(testDateYoutube)
+	unsetNoseedFlag()
+	err := f.Configure("barewm")
+	assert.NoError(t, err)
+	s, err := f.State()
+	assert.NoError(t, err)
+	assert.Equal(t, "140921", s.DateCode.String())
+}
+
 func TestJumpAtBeginBackward(t *testing.T) {
-	f, testHome := frontendForTestConfigured(t, nil)
+	f, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
 	makeTestWallpapers(t, f.Config, "140120")
 	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(-1)
-	if err.Error() != "Begin reached" {
-		t.Fatalf("Wrong error: %v", err)
-	}
+	assert.Equal(t, "Begin reached", err.Error(), "Wrong error message")
 }
 
 func TestJumpAtBeginForward(t *testing.T) {
-	f, testHome := frontendForTestConfigured(t, nil)
+	f, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
 	makeTestWallpapers(t, f.Config, "140120")
 	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(1)
-	if err.Error() != "End reached" {
-		t.Fatalf("Wrong error: %v", err)
-	}
+	assert.Equal(t, "End reached", err.Error(), "Wrong error message")
 }
 
 func TestState(t *testing.T) {
-	APOD, testHome := frontendForTestConfigured(t, nil)
+	APOD, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140121", "fit")
 	rv, err := APOD.State()
-	if err != nil {
-		t.Fatalf("Error during call to State: %v\n", err)
-	}
-	if rv.DateCode != testDateString {
-		t.Errorf("Expected 140121, got %v", rv)
-	}
+	assert.NoError(t, err, "Error during call to State")
+	assert.Equal(t, testDateString, rv.DateCode)
 }
 
 func RunConfiguration(t *testing.T, cfg string, expected string) {
-	f, testHome := frontendForTest(t, nil)
+	f, testHome := frontendForTest(t)
 	defer cleanUp(t, testHome)
 	f.Configure(cfg)
 	script := wallpaperSetScript()
 	bs, err := ioutil.ReadFile(script)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(bs) != expected {
-		t.Fatalf("Expected %s, got: %s", setScriptBareWM, string(bs))
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expected, string(bs))
 }
 
 func TestConfiguration(t *testing.T) {
@@ -166,7 +171,7 @@ func TestConfiguration(t *testing.T) {
 }
 
 func TestLoadconfigNonExistent(t *testing.T) {
-	f, testHome := frontendForTest(t, nil)
+	f, testHome := frontendForTest(t)
 	defer cleanUp(t, testHome)
 
 	err := f.Loadconfig()
@@ -176,44 +181,61 @@ func TestLoadconfigNonExistent(t *testing.T) {
 }
 
 func TestLoadconfigExistent(t *testing.T) {
-	APOD, testHome := frontendForTestConfigured(t, nil)
+	APOD, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
 
 	err := APOD.Loadconfig()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestToday(t *testing.T) {
-	t0 := time.Date(2014, 1, 21, 0, 0, 0, 0, time.UTC)
-	m := clock.NewMock()
-	m.Set(t0)
-
-	front := Frontend{Clock: m}
+	front := Frontend{}
+	setDateFlag(testDateString)
 	var ad ADate
 	ad = front.Today()
 	assert.Equal(t, ad.String(), testDateString)
 }
 
+func TestRandomArchiveEmpty(t *testing.T) {
+	front, testHome := frontendForTestConfigured(t)
+	defer cleanUp(t, testHome)
+	writeWallpaperScript(setScriptSuccess)
+	err := front.RandomArchive()
+	assert.Equal(t, "No backgrounds downloaded yet", err.Error())
+}
+
+func TestRandomArchiveSuccessTwoWallpapers(t *testing.T) {
+	f, testHome := frontendForTestConfigured(t)
+	defer cleanUp(t, testHome)
+	writeWallpaperScript(setScriptSuccess)
+	makeTestWallpapers(t, f.Config, "140119", "140120")
+	err := f.RandomArchive()
+	assert.NoError(t, err)
+}
+
+func TestRandomArchiveSuccessOneWallpaper(t *testing.T) {
+	f, testHome := frontendForTestConfigured(t)
+	defer cleanUp(t, testHome)
+	writeWallpaperScript(setScriptSuccess)
+	makeTestWallpapers(t, f.Config, "140119")
+	err := f.RandomArchive()
+	assert.NoError(t, err)
+}
+
 func TestSetWallpaperSuccess(t *testing.T) {
-	front, testHome := frontendForTestConfigured(t, testRoundTrip{})
+	front, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
 	writeWallpaperScript(setScriptSuccess)
 	err := front.SetWallpaper(State{DateCode: testDateString})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestSetWallpaperFailure(t *testing.T) {
-	front, testHome := frontendForTestConfigured(t, testRoundTrip{})
+	front, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
 	writeWallpaperScript(setScriptFailure)
 	err := front.SetWallpaper(State{DateCode: testDateString})
-	if err.Error() != "Script error: exit status 5. Output: Something went wrong\nFault\n" {
-		t.Fatalf("Wrong error: %v", err)
-	}
+	assert.Equal(t, "Error running Wallpaper-Set-Script: exit status 5. Output: Something went wrong\nFault\n", err.Error())
 }
 
 func TestConfigurationE2e(t *testing.T) {
@@ -223,13 +245,11 @@ func TestConfigurationE2e(t *testing.T) {
 
 	cfg := "barewm"
 	configFlag = &cfg
-	if err := Execute(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, Execute())
 }
 
 func TestJumpWithStateE2e(t *testing.T) {
-	f, testHome := frontendForTestConfigured(t, nil)
+	f, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
 	makeTestWallpapers(t, f.Config, "140119", "140120")
@@ -238,7 +258,5 @@ func TestJumpWithStateE2e(t *testing.T) {
 
 	j := -1
 	jump = &j
-	if err := Execute(); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, Execute())
 }
