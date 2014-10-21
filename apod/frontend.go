@@ -64,21 +64,21 @@ func wallpaperSetScript() string {
 
 const setScriptBareWM = `#!/bin/bash
 if test $WALLPAPER_OPTIONS = zoom; then
-	feh --bg-fill $WALLPAPER
+	feh --bg-fill "$WALLPAPER"
 else
-	feh --bg-max $WALLPAPER
+	feh --bg-max "$WALLPAPER"
 fi
 `
 const setScriptLXDE = `#!/bin/bash
 if test $WALLPAPER_OPTIONS = zoom; then
-	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=crop
+	pcmanfm --set-wallpaper="$WALLPAPER" --wallpaper-mode=crop
 else
-	pcmanfm --set-wallpaper=$WALLPAPER --wallpaper-mode=fit
+	pcmanfm --set-wallpaper="$WALLPAPER" --wallpaper-mode=fit
 fi
 `
 
 const setScriptGNOME = `#!/bin/bash
-gsettings set org.gnome.desktop.background picture-uri file://$WALLPAPER
+gsettings set org.gnome.desktop.background picture-uri "file://$WALLPAPER"
 if test $WALLPAPER_OPTIONS = zoom; then
 	gsettings set  org.gnome.desktop.background picture-options zoom
 else
