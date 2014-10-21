@@ -213,6 +213,15 @@ func TestRandomArchiveSuccessTwoWallpapers(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestRandomArchiveFailureOneWallpaper(t *testing.T) {
+	f, testHome := frontendForTestConfigured(t)
+	defer cleanUp(t, testHome)
+	writeWallpaperScript(setScriptFailure)
+	makeTestWallpapers(t, f.Config, "140119")
+	err := f.RandomArchive()
+	assert.Equal(t, "Error running Wallpaper-Set-Script: exit status 5. Output: Something went wrong\nFault\n", err.Error())
+}
+
 func TestRandomArchiveSuccessOneWallpaper(t *testing.T) {
 	f, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)

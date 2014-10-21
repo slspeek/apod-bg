@@ -396,6 +396,44 @@ func initLogging() (*log.Logger, *os.File, error) {
 // image is sets this as background, otherwise it display a random
 // archive image.
 func (f *Frontend) RunAtLogin() error {
+	today := f.Today()
+	if downloaded, err := f.Config.IsDownloaded(today); downloaded || err != nil {
+		if err != nil {
+			return fmt.Errorf("Could not check whether today was downloaded, because: %v\n", err)
+		}
+		err := f.DisplayCurrent()
+		if err != nil {
+			return fmt.Errorf("Today was already downloaded, but could not display the current wallpaper, because: %v\n", err)
+		} else {
+			f.Log.Printf("Displayed the current wallpaper, as today was already downloaded\n")
+		}
+		return nil
+	}
+	ok, err := f.loader.Download(today)
+	if err != nil {
+		f.Log.Printf("An error occurred during todays (%s) image downloading: %v\n", today, err)
+		// The show must go on
+	}
+	if !ok {
+		f.Log.Printf("No new image today (%s) on APOD\n", today)
+
+		f.Notify(fmt.Sprintf("No new image today :-("))
+		err := f.RandomArchive()
+		if err != nil {
+			return fmt.Errorf("Could not display a random archive, because: %v\n", err)
+		} else {
+			f.Log.Printf("Displayed a random archive wallpaper, as today had no new image\n")
+		}
+		return nil
+	}
+	err = f.SetWallpaper(State{DateCode: today, Options: "fit"})
+	if err != nil {
+		return fmt.Errorf("Could not set the wallpaper to %s, because: %v\n", today, err)
+	} else {
+		mesg := fmt.Sprintf("Wallpaper set to %s\n", today)
+		f.Notify(mesg)
+		f.Log.Printf(mesg)
+	}
 	return nil
 }
 
@@ -421,8 +459,7 @@ func (f *Frontend) RandomArchive() error {
 		return err
 	}
 	s.DateCode = pick
-	f.SetWallpaper(s)
-	return nil
+	return f.SetWallpaper(s)
 }
 
 // Execute is the entry point for the apod-bg command
@@ -434,7 +471,7 @@ func Execute() error {
 	}
 	defer f.Close()
 	var front *Frontend
-	logger.Printf("APOD starts")
+	logger.Printf("apod-bg starts")
 	if *nonotify {
 		front = NewFrontend(logger, Notifier{gnotifier.NullNotification})
 	} else {
@@ -443,7 +480,7 @@ func Execute() error {
 	if *configFlag != "" {
 		err := front.Configure(*configFlag)
 		if err != nil {
-			err = fmt.Errorf("Could not write the configuration, because: %v\n", err)
+			err = fmt.Errorf("Could not properly configure the apod-bg, because: %v\n", err)
 			logger.Printf("%v\n", err)
 			return err
 		}
@@ -488,52 +525,11 @@ func Execute() error {
 	}
 
 	if *login {
-		today := front.Today()
-		if downloaded, err := front.Config.IsDownloaded(today); downloaded || err != nil {
-			if err != nil {
-				err = fmt.Errorf("Could not check whether today was downloaded, because: %v\n", err)
-				logger.Printf("%v\n", err)
-				return err
-			}
-			err := front.DisplayCurrent()
-			if err != nil {
-				err = fmt.Errorf("Today was already downloaded, but could not display the current wallpaper, because: %v\n", err)
-				logger.Printf("%v\n", err)
-				return err
-			} else {
-				logger.Printf("Displayed the current wallpaper, as today was already downloaded\n")
-			}
-			return nil
-		}
-		ok, err := front.loader.Download(today)
+		err := front.RunAtLogin()
 		if err != nil {
-			logger.Printf("An error occurred during todays (%s) image downloading: %v\n", today, err)
-		}
-		if !ok {
-			logger.Printf("No new image today (%s) on APOD\n", today)
-
-			front.Notify(fmt.Sprintf("No new image today :-("))
-			err := front.DisplayCurrent()
-			if err != nil {
-				err = fmt.Errorf("Could not display the current wallpaper, because: %v\n", err)
-				logger.Printf("%v\n", err)
-				return err
-			} else {
-				logger.Printf("Displayed the current wallpaper, as today had no new image\n")
-			}
-			return nil
-		}
-		err = front.SetWallpaper(State{DateCode: today, Options: "fit"})
-		if err != nil {
-			err = fmt.Errorf("Could not set the wallpaper to %s, because: %v\n", today, err)
 			logger.Printf("%v\n", err)
 			return err
-		} else {
-			mesg := fmt.Sprintf("Wallpaper set to %s\n", today)
-			front.Notify(mesg)
-			logger.Printf(mesg)
 		}
-		return nil
 	}
 
 	if *days > 0 {
