@@ -18,18 +18,19 @@ import (
 )
 
 var (
-	info        = flag.Bool("info", false, "open the APOD-page on the current background")
-	login       = flag.Bool("login", false, "do the procedure for APOD graphical login: download todays image and display it")
-	logFileFlag = flag.String("log", "", "logfile specification")
-	days        = flag.Int("fetch", 0, "days to go back downloading")
-	jump        = flag.Int("jump", 0, "jump N backgrounds further, use negative numbers to jump backward")
-	configFlag  = flag.String("config", "", "initializes apod-bg for chosen window-manager")
-	apodFlag    = flag.Bool("apod", false, "opens the default browser on the Astronomy Picture of The Day")
-	mode        = flag.Bool("mode", false, "mode background sizing options: fit or zoom")
-	nonotify    = flag.Bool("nonotify", false, "do not send notifications to the desktop")
-	noseed      = flag.Bool("noseed", false, "do not seed after configuring")
-	dateFlag    = flag.String("date", "", "specify a date to be considered as now (for testing)")
-	randomFlag  = flag.Bool("random", false, "pick a random archive picture")
+	info         = flag.Bool("info", false, "open the APOD-page on the current background")
+	login        = flag.Bool("login", false, "do the procedure for APOD graphical login: download todays image and display it")
+	logFileFlag  = flag.String("log", "", "logfile specification")
+	days         = flag.Int("fetch", 0, "days to go back downloading")
+	jump         = flag.Int("jump", 0, "jump N backgrounds further, use negative numbers to jump backward")
+	configFlag   = flag.String("config", "", "initializes apod-bg for chosen window-manager")
+	unconfigFlag = flag.Bool("unconfig", false, "removes the autostart entry for LXDE")
+	apodFlag     = flag.Bool("apod", false, "opens the default browser on the Astronomy Picture of The Day")
+	mode         = flag.Bool("mode", false, "mode background sizing options: fit or zoom")
+	nonotify     = flag.Bool("nonotify", false, "do not send notifications to the desktop")
+	noseed       = flag.Bool("noseed", false, "do not seed after configuring")
+	dateFlag     = flag.String("date", "", "specify a date to be considered as now (for testing)")
+	randomFlag   = flag.Bool("random", false, "pick a random archive picture")
 )
 
 const (
@@ -39,28 +40,12 @@ const (
 	fit                = "fit"
 )
 
-func logFile() string {
-	if *logFileFlag == "" {
-		return os.ExpandEnv("${HOME}/.config/apod-bg/apod-bg.log")
-	}
-	return *logFileFlag
-}
+const apodDesktop = `[Desktop Entry] 
 
-func configDir() string {
-	return os.ExpandEnv("${HOME}/.config/apod-bg")
-}
+Type=Application
 
-func configFile() string {
-	return filepath.Join(configDir(), configFileBasename)
-}
-
-func stateFile() string {
-	return filepath.Join(configDir(), stateFileBasename)
-}
-
-func wallpaperSetScript() string {
-	return filepath.Join(configDir(), "set-wallpaper.sh")
-}
+Exec=apod-bg -login
+`
 
 const setScriptBareWM = `#!/bin/bash
 if test $WALLPAPER_OPTIONS = zoom; then
@@ -88,6 +73,37 @@ gsettings set  org.gnome.desktop.background primary-color "000000"
 gsettings set  org.gnome.desktop.background secondary-color "000000"
 `
 const configNotFound = "configuration file was not found. Please run apod-bg -config=barewm|gnome|lxde> first, see man page for more information."
+
+func logFile() string {
+	if *logFileFlag == "" {
+		return os.ExpandEnv("${HOME}/.config/apod-bg/apod-bg.log")
+	}
+	return *logFileFlag
+}
+
+func configDir() string {
+	return os.ExpandEnv("${HOME}/.config/apod-bg")
+}
+
+func autostartDir() string {
+	return os.ExpandEnv("${HOME}/.config/autostart")
+}
+
+func autostartFile() string {
+	return filepath.Join(autostartDir(), "apod-bg.desktop")
+}
+
+func configFile() string {
+	return filepath.Join(configDir(), configFileBasename)
+}
+
+func stateFile() string {
+	return filepath.Join(configDir(), stateFileBasename)
+}
+
+func wallpaperSetScript() string {
+	return filepath.Join(configDir(), "set-wallpaper.sh")
+}
 
 type logger interface {
 	Printf(f string, i ...interface{})
@@ -201,6 +217,18 @@ func store(s State) error {
 	return err
 }
 
+func (f *Frontend) writeAutostart() error {
+	err := os.MkdirAll(autostartDir(), 0755)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(autostartFile(), []byte(apodDesktop), 0644)
+}
+
+func (f *Frontend) removeAutostart() error {
+	return os.Remove(autostartFile())
+}
+
 func (f *Frontend) Seed() error {
 	if *noseed {
 		return nil
@@ -253,6 +281,10 @@ func (f *Frontend) Configure(cfg string) error {
 		script = setScriptBareWM
 	case "lxde":
 		script = setScriptLXDE
+		err := f.writeAutostart()
+		if err != nil {
+			return err
+		}
 	case "gnome":
 		script = setScriptGNOME
 	default:
@@ -508,8 +540,20 @@ func Execute() error {
 		return nil
 	}
 
+	if *unconfigFlag {
+		err := front.removeAutostart()
+		if err != nil {
+			logger.Printf("%v\n", err)
+			return err
+		}
+	}
+
 	if *randomFlag {
-		return front.RandomArchive()
+		err := front.RandomArchive()
+		if err != nil {
+			logger.Printf("%v\n", err)
+			return err
+		}
 	}
 
 	if *info {

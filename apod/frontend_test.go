@@ -112,6 +112,25 @@ func TestSeed(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestWriteAutostart(t *testing.T) {
+	f, testHome := frontendForTest(t)
+	defer cleanUp(t, testHome)
+	assert.NoError(t, f.writeAutostart())
+	being, err := exists(filepath.Join(testHome, ".config", "autostart", "apod-bg.desktop"))
+	assert.NoError(t, err)
+	assert.True(t, being)
+}
+
+func TestRemoveAutostart(t *testing.T) {
+	f, testHome := frontendForTest(t)
+	defer cleanUp(t, testHome)
+	assert.NoError(t, f.writeAutostart())
+	assert.NoError(t, f.removeAutostart())
+	being, err := exists(filepath.Join(testHome, ".config", "autostart", "apod-bg.desktop"))
+	assert.NoError(t, err)
+	assert.False(t, being)
+}
+
 func TestSeedYoutube(t *testing.T) {
 	f, testHome := frontendForTest(t)
 	defer cleanUp(t, testHome)
