@@ -256,7 +256,7 @@ func (f *Frontend) Today() ADate {
 }
 
 // configure initializes the configuration according the config argument.
-func (f *Frontend) Configure(cfg string) error {
+func (f *Frontend) configure(cfg string) error {
 	f.Config = new(config)
 	{
 		err := MakeConfigDir()
@@ -293,7 +293,16 @@ func (f *Frontend) Configure(cfg string) error {
 	if err := writeWallpaperScript(script); err != nil {
 		return err
 	}
-	f.Loadconfig()
+	return f.Loadconfig()
+}
+
+// Configure initializes the configuration according the config argument and does seeding
+// of images.
+func (f *Frontend) Configure(cfg string) error {
+	err := f.configure(cfg)
+	if err != nil {
+		return err
+	}
 	return f.Seed()
 }
 

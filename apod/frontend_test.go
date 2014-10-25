@@ -99,29 +99,24 @@ func frontendForTestConfigured(t *testing.T) (*Frontend, string) {
 	f, testHome := frontendForTest(t)
 	err := f.Configure("barewm")
 	assert.NoError(t, err)
-	err = f.Loadconfig()
-	assert.NoError(t, err)
+	assert.NoError(t, f.Loadconfig())
 	assert.NoError(t, writeWallpaperScript(setScriptSuccess))
 	return f, testHome
 }
 
 func TestSeed(t *testing.T) {
-	f, testHome := frontendForTest(t)
+	f, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
-	assert.NoError(t, writeWallpaperScript(setScriptSuccess))
 	unsetNoseedFlag()
-	err := f.Configure("barewm")
-	assert.NoError(t, err)
+	assert.NoError(t, f.Seed())
 }
 
 func TestSeedYoutube(t *testing.T) {
-	f, testHome := frontendForTest(t)
+	f, testHome := frontendForTestConfigured(t)
 	defer cleanUp(t, testHome)
-	assert.NoError(t, writeWallpaperScript(setScriptSuccess))
 	setDateFlag(testDateYoutube)
 	unsetNoseedFlag()
-	err := f.Configure("barewm")
-	assert.NoError(t, err)
+	assert.NoError(t, f.Seed())
 	s, err := f.State()
 	assert.NoError(t, err)
 	assert.Equal(t, "140921", s.DateCode.String())
