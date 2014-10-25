@@ -18,7 +18,7 @@ options=('!strip' '!emptydirs')
 _gourl=github.com/slspeek/apod-bg
 
 build() {
-	GOPATH="$srcdir" go get -fix -v -x ${_gourl}
+	GOPATH="$srcdir" go get -fix -t -v -x ${_gourl}
 }
 
 check() {
