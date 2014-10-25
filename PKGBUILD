@@ -1,11 +1,11 @@
 # Maintainer: Steven Speek <slspeek@gmail.com>
 
-pkgname=apod-bg-dev
-pkgver=$(date +"%Y%m%d.%H.%M.%S")
+pkgname=apod-bg-git
+pkgver=65.ad43df6
 pkgrel=1
 pkgdesc="Automatically sets your background to the new Astronomy Picture Of the Day"
-arch=('x86_64' 'i686')
 url="https://github.com/slspeek/apod-bg"
+arch=('x86_64' 'i686')
 license=('gpl3')
 makedepends=('git' 'go')
 optdepends=(
@@ -13,9 +13,16 @@ optdepends=(
 'pcmanfm: lxde support'
 'dunst: for receiving notifications'
 )
-
 options=('!strip' '!emptydirs')
+source=('git+https://github.com/slspeek/apod-bg')
+md5sums=('SKIP')
+
 _gourl=github.com/slspeek/apod-bg
+_gitname="apod-bg"
+pkgver() {
+  cd $_gitname
+  printf "%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
 
 build() {
 	GOPATH="$srcdir" go get -fix -t -v -x ${_gourl}
