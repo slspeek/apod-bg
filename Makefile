@@ -1,4 +1,4 @@
-all: fmt test vet bench coverage doc
+all: fmt test vet bench coverage
 
 clean:
 	go clean
@@ -11,20 +11,16 @@ prepare-dev:
 presubmit: fmt test vet
 
 test:
-	go test github.com/slspeek/apod-bg...
+	go test github.com/slspeek/apod-bg/apod
 
 vet:
 	go vet github.com/slspeek/apod-bg/apod && go vet main.go
-
-doc:
-	mkdir -p report/doc
-	godoc -html  github.com/slspeek/apod-bg/apod > report/doc/index.html
 
 fmt:
 	go fmt github.com/slspeek/apod-bg... 
 
 bench:
-	go test -benchmem -bench=. github.com/slspeek/apod-bg... 
+	go test -benchmem -bench=. github.com/slspeek/apod-bg 
 
 coverage:
 	mkdir -p report

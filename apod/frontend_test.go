@@ -101,6 +101,7 @@ func frontendForTestConfigured(t *testing.T) (*Frontend, string) {
 	assert.NoError(t, err)
 	err = f.Loadconfig()
 	assert.NoError(t, err)
+	assert.NoError(t, writeWallpaperScript(setScriptSuccess))
 	return f, testHome
 }
 
@@ -110,6 +111,18 @@ func TestSeed(t *testing.T) {
 	unsetNoseedFlag()
 	err := f.Configure("barewm")
 	assert.NoError(t, err)
+}
+
+func TestSeedYoutube(t *testing.T) {
+	f, testHome := frontendForTest(t)
+	defer cleanUp(t, testHome)
+	setDateFlag(testDateYoutube)
+	unsetNoseedFlag()
+	err := f.Configure("barewm")
+	assert.NoError(t, err)
+	s, err := f.State()
+	assert.NoError(t, err)
+	assert.Equal(t, "140921", s.DateCode.String())
 }
 
 func TestWriteAutostart(t *testing.T) {
@@ -129,18 +142,6 @@ func TestRemoveAutostart(t *testing.T) {
 	being, err := exists(filepath.Join(testHome, ".config", "autostart", "apod-bg.desktop"))
 	assert.NoError(t, err)
 	assert.False(t, being)
-}
-
-func TestSeedYoutube(t *testing.T) {
-	f, testHome := frontendForTest(t)
-	defer cleanUp(t, testHome)
-	setDateFlag(testDateYoutube)
-	unsetNoseedFlag()
-	err := f.Configure("barewm")
-	assert.NoError(t, err)
-	s, err := f.State()
-	assert.NoError(t, err)
-	assert.Equal(t, "140921", s.DateCode.String())
 }
 
 func TestJumpAtBeginBackward(t *testing.T) {
