@@ -16,5 +16,5 @@ func TestDownload(t *testing.T) {
 	assert.NoError(t, err)
 	info, err := i.Stat()
 	assert.NoError(t, err)
-	assert.Equal(t, info.Size(), 3684878, "Wrong downloaded file size")
+	assert.Equal(t, 1375, info.Size(), "Wrong downloaded file size")
 }

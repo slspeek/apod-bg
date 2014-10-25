@@ -1,6 +1,5 @@
 *~
 report
 report/*
-testdata/apod.nasa.gov
 *.swp
 *.swo

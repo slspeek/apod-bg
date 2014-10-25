@@ -21,6 +21,9 @@ build() {
 	GOPATH="$srcdir" go get -fix -v -x ${_gourl}
 }
 
+check() {
+	GOPATH="$srcdir" go test -v -x ${_gourl}/...
+}
 
 package() {
 	mkdir -p "$pkgdir/usr/bin"
