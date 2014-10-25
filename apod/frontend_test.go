@@ -108,6 +108,7 @@ func frontendForTestConfigured(t *testing.T) (*Frontend, string) {
 func TestSeed(t *testing.T) {
 	f, testHome := frontendForTest(t)
 	defer cleanUp(t, testHome)
+	assert.NoError(t, writeWallpaperScript(setScriptSuccess))
 	unsetNoseedFlag()
 	err := f.Configure("barewm")
 	assert.NoError(t, err)
@@ -116,6 +117,7 @@ func TestSeed(t *testing.T) {
 func TestSeedYoutube(t *testing.T) {
 	f, testHome := frontendForTest(t)
 	defer cleanUp(t, testHome)
+	assert.NoError(t, writeWallpaperScript(setScriptSuccess))
 	setDateFlag(testDateYoutube)
 	unsetNoseedFlag()
 	err := f.Configure("barewm")
@@ -149,7 +151,6 @@ func TestJumpAtBeginBackward(t *testing.T) {
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
 	makeTestWallpapers(t, f.Config, "140120")
-	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(-1)
 	assert.Equal(t, "Begin reached", err.Error(), "Wrong error message")
 }
@@ -159,7 +160,6 @@ func TestJumpAtBeginForward(t *testing.T) {
 	defer cleanUp(t, testHome)
 	makeStateFile(t, "140120", "fit")
 	makeTestWallpapers(t, f.Config, "140120")
-	writeWallpaperScript(setScriptSuccess)
 	err := f.Jump(1)
 	assert.Equal(t, "End reached", err.Error(), "Wrong error message")
 }
