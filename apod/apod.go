@@ -17,6 +17,8 @@ const (
 
 var imageExpr = regexp.MustCompile(`<a href="(.*\.(jpg|gif|png))"`)
 
+var youtubeExpr = regexp.MustCompile(`src="//www.youtube.com/embed(.*)"`)
+
 // ADate is an APOD date string
 type ADate string
 
@@ -66,7 +68,12 @@ func (a *APOD) ContainsImage(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	m := imageExpr.FindStringSubmatch(content)
+	var m []string
+	m = youtubeExpr.FindStringSubmatch(content)
+	if m != nil {
+		return "", nil
+	}
+	m = imageExpr.FindStringSubmatch(content)
 	if m != nil && m[1] != "" {
 		return a.Site + "apod/" + m[1], nil
 	}
@@ -83,6 +90,9 @@ func (a *APOD) Download(file, url string) error {
 	resp, err := a.Client.Get(url)
 	if err != nil {
 		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Getting %s returned status: %s", url, resp.Status)
 	}
 	defer resp.Body.Close()
 

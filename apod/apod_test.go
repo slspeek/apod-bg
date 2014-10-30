@@ -68,6 +68,13 @@ func TestUrlForDate(t *testing.T) {
 	assert.Equal(t, "http://apod.nasa.gov/apod/ap140121.html", url)
 }
 
+func TestContainsImageYoutubeDay(t *testing.T) {
+	apod := testAPOD()
+	url, err := apod.ContainsImage(testAPODSite + "apod/ap141013.html")
+	assert.NoError(t, err)
+	assert.Equal(t, "", url)
+}
+
 func TestContainsImage(t *testing.T) {
 	apod := testAPOD()
 	url, err := apod.ContainsImage(testAPODSite + "apod/ap140921.html")
@@ -80,4 +87,9 @@ func TestLoadPage(t *testing.T) {
 	page, err := a.loadPage(testAPODSite + "apod/ap140921.html")
 	assert.NoError(t, err)
 	assert.Equal(t, 5069, len(page))
+}
+
+func TestDownloadNoGoodStatus(t *testing.T) {
+	a := testAPOD()
+	assert.Equal(t, "Getting http://localhost:8765/NotFound returned status: 404 Not Found", a.Download("unused", "http://localhost:8765/NotFound").Error())
 }
