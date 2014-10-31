@@ -1,6 +1,6 @@
 .\" Manpage for apod-bg
 .\" Contact slspeek@gmail.com to correct errors or typos.
-.TH man 1 "4 Sep 2014" "1.0" "apod-bg man page"
+.TH man 1 "31 Oct 2014" "1.0" "apod-bg man page"
 .SH NAME
 apod-bg \- downloads and set as wallpaper images from Astronomy Picture of The Day
 .SH SYNOPSIS
@@ -13,7 +13,10 @@ Downloads and displays NASA Astronomy Picture of The Day as wallpaper.
 opens default browser on the Astronomy Picture of The Day
 .TP
 \-config=<barewm|gnome|lxde>
-initializes apod-bg for chosen window-manager
+initializes apod-bg for chosen window-manager. If lxde was chosen, an autostart entry will be added as well.
+.TP
+\-unconfig
+removes the apod-bg.desktop file from $HOME/.config/autostart/
 .TP
 \-fetch=<count>
 days to go back downloading
@@ -54,7 +57,8 @@ Login option is used when calling apod-bg in your ~/.xinit or session-startup-pr
 .TP
 contains the configurable option WallpaperDir
 .SH CONFIGURATION OF SHORTCUTS
-See /user/share/doc/apod-bg/i3wm.config for an example on how to configure your wm.
+See /user/share/doc/apod-bg-git/i3wm.config for an example on how to configure i3. And
+see /usr/share/doc/apod-bg-git/lxde.config on how to configure the shortcuts for LXDE.
 .SH EXIT STATUS
 returns a zero status if it succeeds. Non zero is returned in case of failure.
 .SH SEE ALSO
