@@ -586,7 +586,11 @@ func Execute() error {
 	}
 
 	if *days > 0 {
-		front.loader.LoadPeriod(front.Today(), *days)
+		err := front.loader.LoadPeriod(front.Today(), *days)
+		if err != nil {
+			logger.Printf("Error during fetch: %v\n", err)
+			return err
+		}
 	}
 
 	if *jump != 0 {
